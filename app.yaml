@@ -1,0 +1,14 @@
+# goapp deploy -application [PROJECT_ID] -version [V_ID]
+runtime: go
+api_version: go1
+
+handlers:
+- url: /static
+  static_dir: static
+
+- url: /.*
+  script: _go_app
+
+#env_variables: # use os.Getenv("MY_VAR") -> "my value"
+#  FIREBASE_PROJECT_ID: `pupal-164400`
+
