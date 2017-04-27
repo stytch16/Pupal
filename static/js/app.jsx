@@ -109,6 +109,12 @@ class Login extends React.Component {
 }
 
 class Home extends React.Component {
+	constructor() {
+		super();
+		this.state = {
+			option: null
+		};
+	}
 	render() {
 		var user = firebase.auth().currentUser;
 		return (
@@ -117,12 +123,86 @@ class Home extends React.Component {
 					<h1 className="title">
 						Welcome to Pupal, {user.displayName} !
 					</h1>
+					<button onClick={()=>this.setState({option:1})} className="projectsButton">
+						Browse Projects
+					</button>
+					<button onClick={()=>this.setState({option:2})} className="usersButton">
+						Browse Users
+					</button>
+					<button onClick={()=>this.setState({option:3})} className="hostButton">
+						Host a Project
+					</button>
+					<button onClick={()=>this.setState({option:4})} className="profileButton">
+						Go to Profile
+					</button>
 					<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn">
 						Logout
 					</button>
+
+					<BrowseProjects option={this.state.option} />
+					<BrowseUsers option={this.state.option} />
+					<HostProject option={this.state.option} />
+					<GoToProfile option={this.state.option} />
 				</div>
 			</div>
 		);
+	}
+}
+
+class BrowseProjects extends React.Component {
+	render() {
+		if (this.props.option != 1) {
+			return null;
+		} 
+		return (
+			<div className="browse_projects_page">
+				<h1>Browse projects !</h1>
+			</div>
+		);
+		
+	}
+}
+
+class BrowseUsers extends React.Component {
+	render() {
+		if (this.props.option != 2) {
+			return null;
+		} 
+		return (
+			<div className="browse_users_page">
+				<h1>Browse Users !</h1>
+			</div>
+		);
+		
+	}
+}
+
+class HostProject extends React.Component {
+	render() {
+		if (this.props.option != 3) {
+			return null;
+		} 
+		return (
+			<div className="host_project_page">
+				<h1>Host projects !</h1>
+			</div>
+		);
+		
+	}
+}
+
+
+class GoToProfile extends React.Component {
+	render() {
+		if (this.props.option != 4) {
+			return null;
+		} 
+		return (
+			<div className="profile_page">
+				<h1>Go to Profile !</h1>
+			</div>
+		);
+		
 	}
 }
 

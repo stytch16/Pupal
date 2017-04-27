@@ -1,4 +1,5 @@
 # Pupal
+### https://pupal-164400.appspot.com/
 
 Uses
 
@@ -24,8 +25,11 @@ Run app (Note it will set a listener for any changes to your code and auto-reloa
 ### Docs:
 
 * Go GAE Standard : https://cloud.google.com/appengine/docs/standard/go/how-to
+* GAE app.yaml : https://cloud.google.com/appengine/docs/standard/go/config/appref
 * Datastore: https://cloud.google.com/datastore/docs/how-to
 * Firebase Auth : https://firebase.google.com/docs/auth/web/manage-users
-* React : https://facebook.github.io/react/docs/react-component.html
+* React Components : https://facebook.github.io/react/docs/react-component.html
+* React Conditional Rendering : https://facebook.github.io/react/docs/conditional-rendering.html
+* Material Design Lite : https://getmdl.io/index.html
 
 

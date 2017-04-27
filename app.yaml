@@ -8,6 +8,7 @@ handlers:
 
 - url: /.*
   script: _go_app
+  secure: always
 
 #env_variables: # use os.Getenv("MY_VAR") -> "my value"
 #  FIREBASE_PROJECT_ID: `pupal-164400`

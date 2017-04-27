@@ -46,7 +46,9 @@ func init() {
 
 	// User handlers
 	userRouter := mux.NewRouter().PathPrefix("/users").Subrouter()
-	userRouter.HandleFunc("/{id}", UserHandler).Methods("GET")
+	userRouter.HandleFunc("/register", UserRegisterHandler).Methods("GET")
+	userRouter.HandleFunc("/delete", UserDeleteHandler).Methods("GET")
+	userRouter.HandleFunc("/{id}", UserGetHandler).Methods("GET")
 	userRouter.HandleFunc("/{id}/message", UserMsgHandler).Methods("POST")
 
 	// User routes middleware
@@ -83,6 +85,9 @@ func init() {
 
 	// Matchmaking routes middleware
 	r.PathPrefix("/match").Handler(common.With(negroni.Wrap(matchMakerRouter)))
+
+	// Admin routes (See app.yaml for how to configure.)
+	// /admin/.../...
 
 	http.Handle("/", r)
 }
