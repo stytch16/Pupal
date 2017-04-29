@@ -1,11 +1,12 @@
 /* Shared */
 .title {
-	font-family: "Roboto", Roboto, arial, sans-serif;
+	font-family: 'Baloo', cursive;
 }
+
 .loginBtn {
 	box-sizing: border-box;
 	position: relative;
-	/* width: 13em;  - apply for fixed size */
+	width: 13em;
 	margin: 0.2em;
 	padding: 0 15px 0 46px;
 	border: none;
@@ -57,8 +58,24 @@
 .loginBtn--google:before {
 	border-right: #BB3F30 1px solid;
 	background: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/icon_google.png') 6px 6px no-repeat;
+	
 }
 .loginBtn--google:hover,
 .loginBtn--google:focus {
 	background: #E74B37;
+}
+
+/* Home */
+.user_info {
+	position: relative;
+}
+#user-photo {
+	border-radius: 50%;
+	height: auto;
+	width: auto;
+	max-width: 50px;
+	max-height: 50px;
+	position: absolute;
+	top: 10px;
+	right: 10px;
 }

@@ -29,7 +29,9 @@ func init() {
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 
 	// Common middleware
-	common := negroni.New(negroni.HandlerFunc(ValidateToken), negroni.HandlerFunc(NotImplemented))
+
+	common := negroni.New(negroni.HandlerFunc(ValidateToken))
+	admin := negroni.New(negroni.HandlerFunc(AdminToken))
 
 	// Project handlers
 	projectRouter := mux.NewRouter().PathPrefix("/projects").Subrouter()
@@ -46,7 +48,8 @@ func init() {
 
 	// User handlers
 	userRouter := mux.NewRouter().PathPrefix("/users").Subrouter()
-	userRouter.HandleFunc("/register", UserRegisterHandler).Methods("GET")
+	userRouter.HandleFunc("/registerPupalUser", UserRegisterPupalHandler).Methods("POST")
+	userRouter.HandleFunc("/registerDomain", UserRegisterDomainHandler).Methods("POST")
 	userRouter.HandleFunc("/delete", UserDeleteHandler).Methods("GET")
 	userRouter.HandleFunc("/{id}", UserGetHandler).Methods("GET")
 	userRouter.HandleFunc("/{id}/message", UserMsgHandler).Methods("POST")
@@ -56,8 +59,9 @@ func init() {
 
 	// Domain handlers
 	domainRouter := mux.NewRouter().PathPrefix("/domain").Subrouter()
-	domainRouter.HandleFunc("{id}", DomainHandler).Methods("GET")
-	domainRouter.HandleFunc("{id}/subscribe", DomainSubsHandler).Methods("GET")
+	domainRouter.HandleFunc("/list", DomainListHandler).Methods("GET")
+	domainRouter.HandleFunc("/{id}", DomainGetHandler).Methods("GET")
+	domainRouter.HandleFunc("/{id}/subscribe", DomainSubsHandler).Methods("GET")
 
 	// Domain routes middleware
 	r.PathPrefix("/domain").Handler(common.With(negroni.Wrap(domainRouter)))
@@ -88,6 +92,10 @@ func init() {
 
 	// Admin routes (See app.yaml for how to configure.)
 	// /admin/.../...
+	adminRouter := mux.NewRouter().PathPrefix("/admin").Subrouter()
+	adminRouter.HandleFunc("/domain/add", AdminAddDomainHandler).Methods("POST")
+	adminRouter.HandleFunc("/pupalusers", AdminGetUsersHandler).Methods("GET")
+	r.PathPrefix("/admin").Handler(admin.With(negroni.Wrap(adminRouter)))
 
 	http.Handle("/", r)
 }
@@ -101,6 +109,7 @@ func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 	token, err := auth.VerifyIDTokenWithTransport(
 		r.Header.Get("Authorization"), urlfetch.Client(c).Transport)
 	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		log.Printf("ValidateToken: Failed to validate a token\n%v\n", err)
 		return
 	}
@@ -110,7 +119,12 @@ func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 	next(w, r)
 }
 
-func NotImplemented(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	w.Write([]byte("Handler has not been implemented.\n"))
+func AdminToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	log.Println("Admin request: ", r.Header.Get("Authorization"))
+	if r.Header.Get("Authorization") != AdminUID {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Println("AdminToken: Not admin.")
+		return
+	}
 	next(w, r)
 }

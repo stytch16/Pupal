@@ -2,12 +2,11 @@ class App extends React.Component {
 	constructor() {
 		super();
 		this.state = {
-			loggedIn: false
+			loggedIn: null
 		};
 	}
 	componentWillMount() {
 		this.configFirebase();
-		this.setupAjax();
 		this.setLoginListener();
 	}
 	configFirebase() {
@@ -21,21 +20,6 @@ class App extends React.Component {
 		};
 		firebase.initializeApp(config);
 		console.log("Firebase initialized");
-	}
-	setupAjax() {
-		$.ajaxSetup({
-			'beforeSend': function(xhr) {
-				var user = firebase.auth().currentUser;
-				if (user) {
-					user.getToken(true).then(function(token) {
-						xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-					}, function(error) {
-						console.log("Error sending AJAX request (" + error.code + "): " + error.message);
-					});
-				}
-			}
-		});
-		console.log("AJAX Requests set for auth");
 	}
 	setLoginListener() {
 		console.log("Setting up login listener");
@@ -72,11 +56,9 @@ class App extends React.Component {
 				console.log("User has signed out");
 			}, function(error) {
 				console.log("Error logging user out (" + error.code + "): " + error.message);
-				//alert("Error logging user out (" + error.code + "): " + error.message);
 			});
 		} else {
 			console.log("Error logging user out (500): User state was lost")
-			//alert("Error logging user out (500): User state was lost");
 		}
 	}
 	render() {
@@ -96,11 +78,11 @@ class Login extends React.Component {
 					<h1 className="title">
 						Pupal
 					</h1>
-					<button onClick={()=>this.props.onGoogleClick()} className="loginBtn loginBtn--google">
-						Login with Google
+					<button type="button" onClick={()=>this.props.onGoogleClick()} className="btn btn-danger loginBtn loginBtn--google">
+						Google Login
 					</button>
-					<button onClick={()=>this.props.onFacebookClick()} className="loginBtn loginBtn--facebook">
-						Login with Facebook
+					<button type="button" onClick={()=>this.props.onFacebookClick()} className="btn btn-primary loginBtn loginBtn--facebook">
+						Facebook Login
 					</button>
 				</div>
 			</div>
@@ -108,44 +90,164 @@ class Login extends React.Component {
 	}
 }
 
+function List(props) {
+	return (
+		<div className="list-group" key="domain_listing">
+		{
+			props.domains.map((item) => 
+				<button type="button" className="list-group-item" key={item} onClick={() => props.onDomainClick(item)}>
+					{item}
+				</button>)
+		}
+		</div>
+	);
+}
+
 class Home extends React.Component {
 	constructor() {
 		super();
 		this.state = {
-			option: null
+			option: null, // home menu option
+			domain: null, // enter domain name
+			belong: null, // user's domain name
+			initialDomains: [], // list of all domains
+			domains: [] // list of updated domains based on user input
 		};
+		this.filterList = this.filterList.bind(this);
+	}
+	componentWillMount() {
+		const setDomains = (res) => {
+			res = JSON.parse(res).map((item) => item.name);
+			this.setState({initialDomains: res, domains: res});
+		};
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/list",
+				type: "GET",
+				beforeSend: function(xhr){xhr.setRequestHeader(
+					'Authorization', token);},
+				success: (res) => setDomains(res)
+			});
+			/*
+			$.ajax({
+				url:"/users/registerDomain",
+				type: "POST",
+				beforeSend: function(xhr){xhr.setRequestHeader(
+					'Authorization', token);},
+				success: (res) => regUser(res)
+			});
+			*/
+		});
+	}
+	componentDidMount() {
+		console.log("Mounted!");
+		const showDomainModal = () => {
+			this.setState({belong:false});
+			$('#join_domain_modal').modal('toggle'); };
+
+		var user = firebase.auth().currentUser;
+		console.log("Set firebase user");
+		firebase.database().ref('users/' + user.uid).set({
+			name: user.displayName,
+			email: user.email,
+			photo: user.photoURL
+		});
+
+		console.log("Checking user domain field");
+		firebase.database().ref('users/' + user.uid).once('value').then(function(snapshot) {
+			if (snapshot.val().domain !== undefined) {
+				console.log(snapshot.val().name, " already belongs to a domain = [", snapshot.val().domain,"]");
+
+				// User has a domain
+			} else {
+				firebase.auth().currentUser.getToken(true).then(function(token) {
+					$.ajax({
+						url:"/users/registerPupalUser",
+						type: "POST",
+						contentType: "application/json",
+						data: JSON.stringify({name: user.displayName, email: user.email,photo: user.photoURL}),
+						beforeSend: function(xhr){xhr.setRequestHeader(
+							'Authorization', token);},
+						success: () => showDomainModal() 
+					});
+				});
+			}
+		});
+	}
+	handleDomainClick(domain) {
+		this.setState({option: 1, domain: domain});
+	}
+	filterList(event) {
+		let updatedList = this.state.initialDomains;
+		updatedList = updatedList.filter(function(item) {
+			return item.toLowerCase().search(event.target.value.toLowerCase()) !== -1;
+		});
+		this.setState({domains: updatedList});
 	}
 	render() {
 		var user = firebase.auth().currentUser;
 		return (
 			<div className="container">
+				<div id="user_info">
+					<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
+					<h5>{user.email}</h5>
+				</div>
 				<div className="col-xs-12 text-center">
-					<h1 className="title">
+					<div id="join_domain_modal" className="modal fade" role="dialog">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal">&times;</button>
+									<h4 className="modal-title">Search and join your Pupal domain!</h4>
+								</div>
+								<div className="modal-body">
+									<p>
+										Your domain can be your school, university, group and/or organization.<br />Pupal associates your projects to your domain(s) while allowing you to subscribe to<br />people and projects from other domains for notifications and updates.
+									</p>
+								</div>
+								<div className="modal-footer">
+									<button type="button" className="btn btn-default" data-dismiss="modal">Close</button>
+								</div>
+							</div>
+						</div>
+					</div>
+					<h2 className="title">
 						Welcome to Pupal, {user.displayName} !
-					</h1>
-					<button onClick={()=>this.setState({option:1})} className="projectsButton">
-						Browse Projects
-					</button>
-					<button onClick={()=>this.setState({option:2})} className="usersButton">
-						Browse Users
-					</button>
-					<button onClick={()=>this.setState({option:3})} className="hostButton">
+					</h2>
+					<div className="filtered-list md-form">
+						<input type="text" className="form-control " placeholder="Enter domain" onChange={this.filterList} />
+						<List domains={this.state.domains} onDomainClick={(domain)=>this.handleDomainClick(domain)} />
+					</div>
+					<button onClick={()=>this.setState({option:2})} className="hostButton btn btn-default">
 						Host a Project
 					</button>
-					<button onClick={()=>this.setState({option:4})} className="profileButton">
+					<button onClick={()=>this.setState({option:3})} className="profileButton btn btn-default">
 						Go to Profile
 					</button>
-					<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn">
+					<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn btn btn-default">
 						Logout
 					</button>
 
-					<BrowseProjects option={this.state.option} />
-					<BrowseUsers option={this.state.option} />
+					<Domain option={this.state.option} name={this.state.domain} />
 					<HostProject option={this.state.option} />
 					<GoToProfile option={this.state.option} />
 				</div>
 			</div>
 		);
+	}
+}
+
+class Domain extends React.Component {
+
+	render() {
+		if (this.props.option != 1) {
+			return null;
+		}
+		return (
+			<div className="domain_page">
+				<h3>Show {this.props.name}'s page !</h3>
+			</div>
+		)
 	}
 }
 
@@ -179,12 +281,12 @@ class BrowseUsers extends React.Component {
 
 class HostProject extends React.Component {
 	render() {
-		if (this.props.option != 3) {
+		if (this.props.option != 2) {
 			return null;
 		} 
 		return (
 			<div className="host_project_page">
-				<h1>Host projects !</h1>
+				<h3>Host projects !</h3>
 			</div>
 		);
 		
@@ -194,12 +296,12 @@ class HostProject extends React.Component {
 
 class GoToProfile extends React.Component {
 	render() {
-		if (this.props.option != 4) {
+		if (this.props.option != 3) {
 			return null;
 		} 
 		return (
 			<div className="profile_page">
-				<h1>Go to Profile !</h1>
+				<h3>Go to Profile !</h3>
 			</div>
 		);
 		

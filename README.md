@@ -20,7 +20,7 @@ Run app (Note it will set a listener for any changes to your code and auto-reloa
 
 * $ dev_appserver.py app.yaml
 * or $ dev_appserver.py .
-* To clear datastore, $ dev_appserver.py --clear_datastore.py .
+* To clear datastore, $ dev_appserver.py --clear_datastore.py=yes .
 
 ### Docs:
 

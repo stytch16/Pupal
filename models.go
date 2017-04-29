@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"cloud.google.com/go/datastore"
+	"google.golang.org/appengine/datastore"
 )
 
 type User struct {
@@ -34,6 +34,7 @@ type Domain struct {
 	Key         *datastore.Key   `json:"id" datastore:"-"`
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
+	PhotoURL    string           `json:"photo_url"`
 	Comments    []Comment        `json:"comments"`
 	Subscribers []*datastore.Key `json:"subscribers"`
 }
