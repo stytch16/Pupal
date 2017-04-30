@@ -11,7 +11,7 @@ type User struct {
 	Name     string           `json:"name"`
 	Email    string           `json:"email"`
 	Photo    string           `json:"photo"`
-	Domain   string           `json:"domain"`
+	Domains  []string         `json:"domain"`
 	Summary  string           `json:"summary"`
 	Skills   []string         `json:"skills"`
 	Projects []*datastore.Key `json:"projects"` // keys of hosted projects
@@ -28,7 +28,7 @@ type Project struct {
 	Subscribers []*datastore.Key `json:"subscribers"`
 }
 
-// Pupal is a special domain where all users are added as subscribers.
+// ~pupal is a special domain where all users are added as subscribers.
 // By doing this, Pupal can globally notify users regarding site updates.
 type Domain struct {
 	Key         *datastore.Key   `json:"id" datastore:"-"`

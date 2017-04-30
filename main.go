@@ -61,6 +61,7 @@ func init() {
 	domainRouter := mux.NewRouter().PathPrefix("/domain").Subrouter()
 	domainRouter.HandleFunc("/list", DomainListHandler).Methods("GET")
 	domainRouter.HandleFunc("/{id}", DomainGetHandler).Methods("GET")
+	domainRouter.HandleFunc("/{id}/join", DomainJoinHandler).Methods("GET")
 	domainRouter.HandleFunc("/{id}/subscribe", DomainSubsHandler).Methods("GET")
 
 	// Domain routes middleware
@@ -90,8 +91,7 @@ func init() {
 	// Matchmaking routes middleware
 	r.PathPrefix("/match").Handler(common.With(negroni.Wrap(matchMakerRouter)))
 
-	// Admin routes (See app.yaml for how to configure.)
-	// /admin/.../...
+	// Admin routes
 	adminRouter := mux.NewRouter().PathPrefix("/admin").Subrouter()
 	adminRouter.HandleFunc("/domain/add", AdminAddDomainHandler).Methods("POST")
 	adminRouter.HandleFunc("/pupalusers", AdminGetUsersHandler).Methods("GET")
@@ -102,10 +102,11 @@ func init() {
 
 // ValidateToken validates the user's firebase token in the Authorization header field
 // of the request. After authenticating, it extracts the user's uid.
-// See 'negroni' middleware function.
+// See 'negroni' middleware function for function signature.
 func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	c := appengine.NewContext(r)
 	auth, _ := firebase.GetAuth()
+	log.Printf("ValidateToken: %s\n", r.Header.Get("Authorization"))
 	token, err := auth.VerifyIDTokenWithTransport(
 		r.Header.Get("Authorization"), urlfetch.Client(c).Transport)
 	if err != nil {
@@ -114,16 +115,15 @@ func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 		return
 	}
 	uid, _ := token.UID()
-	context.Set(r, "UID", uid) // context.Get(r, "UID).(string)
-	log.Printf("ValidateToken: Successfully extracted token, uid = %v\n", uid)
+	context.Set(r, "UID", uid) // context.Get(r, "UID).(string) to retrieve it
 	next(w, r)
 }
 
+// AdminToken validates an admin token in the Authorization header field of the request.
 func AdminToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	log.Println("Admin request: ", r.Header.Get("Authorization"))
 	if r.Header.Get("Authorization") != AdminUID {
 		w.WriteHeader(http.StatusUnauthorized)
-		log.Println("AdminToken: Not admin.")
+		w.Write([]byte("Invalid admin token."))
 		return
 	}
 	next(w, r)

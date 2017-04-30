@@ -25,9 +25,9 @@ class App extends React.Component {
 		console.log("Setting up login listener");
 		firebase.auth().onAuthStateChanged((user) => {
 			if (user) {
-				this.setState({loggedIn: true}, ()=>console.log("set Login to ", this.state.loggedIn));
+				this.setState({loggedIn: true});
 			} else {
-				this.setState({loggedIn: false}, ()=>console.log("set Login to ", this.state.loggedIn));
+				this.setState({loggedIn: false});
 			}
 		});
 	}
@@ -103,13 +103,14 @@ function List(props) {
 	);
 }
 
+// Home page
 class Home extends React.Component {
 	constructor() {
 		super();
 		this.state = {
 			option: null, // home menu option
-			domain: null, // enter domain name
 			belong: null, // user's domain name
+			domain: null, // enter domain
 			initialDomains: [], // list of all domains
 			domains: [] // list of updated domains based on user input
 		};
@@ -117,8 +118,8 @@ class Home extends React.Component {
 	}
 	componentWillMount() {
 		const setDomains = (res) => {
-			res = JSON.parse(res).map((item) => item.name);
-			this.setState({initialDomains: res, domains: res});
+			res = res.map(item => item.name);
+			this.setState({initialDomains: res});
 		};
 		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
@@ -147,45 +148,59 @@ class Home extends React.Component {
 
 		var user = firebase.auth().currentUser;
 		console.log("Set firebase user");
-		firebase.database().ref('users/' + user.uid).set({
-			name: user.displayName,
-			email: user.email,
-			photo: user.photoURL
-		});
 
-		console.log("Checking user domain field");
 		firebase.database().ref('users/' + user.uid).once('value').then(function(snapshot) {
-			if (snapshot.val().domain !== undefined) {
-				console.log(snapshot.val().name, " already belongs to a domain = [", snapshot.val().domain,"]");
-
-				// User has a domain
-			} else {
-				firebase.auth().currentUser.getToken(true).then(function(token) {
+			if (snapshot.val() === null) {
+				console.log("User is entirely new");
+				firebase.database().ref('users/'+user.uid).set({
+					name: user.displayName,
+					email: user.email,
+					photo: user.photoURL,
+					domain: false,
+					messages: []
+				});
+				user.getToken(true).then(function(token) {
 					$.ajax({
 						url:"/users/registerPupalUser",
 						type: "POST",
 						contentType: "application/json",
-						data: JSON.stringify({name: user.displayName, email: user.email,photo: user.photoURL}),
-						beforeSend: function(xhr){xhr.setRequestHeader(
-							'Authorization', token);},
+						data: JSON.stringify(
+							{
+							name: user.displayName, 
+							email: user.email,
+							photo: user.photoURL
+							}),
+						beforeSend: function(xhr) {
+							xhr.setRequestHeader('Authorization', token);
+							},
 						success: () => showDomainModal() 
 					});
 				});
+			} else if (snapshot.val().domain === false) {
+				console.log("User has no domain but is already a Pupal user");
+				showDomainModal()
 			}
 		});
 	}
 	handleDomainClick(domain) {
-		this.setState({option: 1, domain: domain});
+		this.setState({option:1, domain:domain});
 	}
 	filterList(event) {
-		let updatedList = this.state.initialDomains;
-		updatedList = updatedList.filter(function(item) {
-			return item.toLowerCase().search(event.target.value.toLowerCase()) !== -1;
-		});
-		this.setState({domains: updatedList});
+		if (event.target.value.length !== 0) {
+			let updatedList = this.state.initialDomains;
+			updatedList = updatedList.filter(function(item) {
+				return item.toLowerCase().search(event.target.value.toLowerCase()) !== -1;
+			});
+			this.setState({domains: updatedList});
+		} else {
+			this.setState({domains: []});
+		}
 	}
 	render() {
 		var user = firebase.auth().currentUser;
+		if (this.state.option === 1) {
+			return (<Domain name={this.state.domain} onLogoutClick={()=>this.props.onLogoutClick()} />)
+		}
 		return (
 			<div className="container">
 				<div id="user_info">
@@ -198,11 +213,11 @@ class Home extends React.Component {
 							<div className="modal-content">
 								<div className="modal-header">
 									<button type="button" className="close" data-dismiss="modal">&times;</button>
-									<h4 className="modal-title">Search and join your Pupal domain!</h4>
+									<h4 className="modal-title">Looks like you need to join a Pupal domain!</h4>
 								</div>
 								<div className="modal-body">
 									<p>
-										Your domain can be your school, university, group and/or organization.<br />Pupal associates your projects to your domain(s) while allowing you to subscribe to<br />people and projects from other domains for notifications and updates.
+										Your domain can be your school, university, group and/or organization.<br /><br />Pupal associates your projects to your domain(s) while allowing you to subscribe to<br />people and projects from other domains for notifications and updates.
 									</p>
 								</div>
 								<div className="modal-footer">
@@ -228,7 +243,6 @@ class Home extends React.Component {
 						Logout
 					</button>
 
-					<Domain option={this.state.option} name={this.state.domain} />
 					<HostProject option={this.state.option} />
 					<GoToProfile option={this.state.option} />
 				</div>
@@ -237,15 +251,175 @@ class Home extends React.Component {
 	}
 }
 
-class Domain extends React.Component {
+/*
+function DisplayMemberPhotoPanel(props) {
+	return (
+		<div className="members-panel panel panel-default col-xs-6">
+			<div className="panel-body">
+				{(props.members !== null) ? (
+					<h5><i>{props.members.length} members.</i></h5>
+					<div className="photoPanel">
+					{
+					props.members.map((item) => 
+						<img className="super-little-rcorner-img img-fluid" src={item.photo}>
+					)
+					}
+					</div>
+				) : (
+					<h5><i>No members yet. Join or refer someone to join!</i></h5>
+				)}
+			</div>
+		</div>
+	);
+}
+*/
 
-	render() {
-		if (this.props.option != 1) {
-			return null;
+function DisplayPhotoPanel(props) {
+	return (
+		<div className="photo_array">
+		{
+			props.users.map((item) =>
+				<img key={item.photo} className="super-little-rcorner-image img-fluid" src={item.photo}></img>)
 		}
+		</div>
+	)
+}
+
+function DisplayMemberPhotoPanel(props) {
+	return (
+		<div className="members-panel panel panel-default col-xs-6">
+			<div className="panel-body">
+				{(props.members.length !== 0) ? (
+					<div className="photo-display-panel">
+						<h5><i>{props.members.length} member(s).</i></h5>
+						<DisplayPhotoPanel users={props.members} />
+					</div>
+
+				) : (
+					<h5><i>No members yet. Join or refer someone to join!</i></h5>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function DisplaySubscriberPhotoPanel(props) {
+	return (
+		<div className="subscribers-panel panel panel-default col-xs-6">
+			<div className="panel-body">
+				{(props.subscribers.length !== 0) ? (
+					<div className="photo-display-panel">
+						<h5><i>{props.subscribers.length} subscriber(s).</i></h5>
+						<DisplayPhotoPanel users={props.subscribers} />
+					</div>
+				) : (
+					<h5><i>No subscribers yet. Be the first to subscribe!</i></h5>
+				)}
+			</div>
+		</div>
+	);
+}
+
+// Domain page
+class Domain extends React.Component {
+	constructor() {
+		super();
+		this.state = {
+			desc: null,
+			photo: null,
+			comments: [],
+			members: [],
+			subscribers: []
+		};
+	}
+	componentWillMount() {
+		this.getDomainInfo(this.props.name);
+	}
+	getDomainInfo(name) {
+		console.log("Getting info of domain, ", name)
+		const setStates = (res) => {
+			this.setState({
+				desc: res.description,
+				photo: res.photo_url,
+				comments: res.comments,
+				members: res.members,
+				subscribers: res.subscribers
+				});
+		};
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/"+name,
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setStates(res)
+			});
+		});
+	}
+	joinDomain(name) {
+		var user = firebase.auth().currentUser;
+		console.log("Joining", name);
+		user.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/"+name+"/join",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: () => console.log("user has joined " + name)
+			});
+		});
+		firebase.database().ref('users/' + user.uid).update({
+			domain: true
+		});
+
+	}
+	subscribeDomain(name) {
+		console.log("Subscribing to", name);
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/"+name+"/subscribe",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: () => console.log("user has subscribed to " + name)
+			});
+		});
+	}
+	render() {
+		var user = firebase.auth().currentUser;
 		return (
-			<div className="domain_page">
-				<h3>Show {this.props.name}'s page !</h3>
+			<div className="container">
+				<div id="user_info">
+					<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
+					<h5>{user.email}</h5>
+				</div>
+				<div className="col-xs-12 text-center domain-info">
+					<div className="domain-img">
+						<img src={this.state.photo} className="little-round-image img-fluid"></img>
+					</div>
+					<div className="domain-page">
+						<h2>{this.props.name}</h2>
+					</div>
+					<div className="domain-desc">
+						<h5>{this.state.desc}</h5>
+					</div>
+					<button onClick={()=>this.joinDomain(this.props.name)} className="joinBtn btn btn-default">
+						Join
+					</button>
+					<button onClick={()=>this.subscribeDomain(this.props.name)} className="subscribeBtn btn btn-default">
+						Subscribe
+					</button>
+					<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn btn btn-default">
+						Logout
+					</button>
+				</div>
+
+				<DisplayMemberPhotoPanel members={this.state.members} />
+				<DisplaySubscriberPhotoPanel subscribers={this.state.subscribers} />
+				
 			</div>
 		)
 	}
