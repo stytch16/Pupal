@@ -151,7 +151,7 @@ class Home extends React.Component {
 
 		firebase.database().ref('users/' + user.uid).once('value').then(function(snapshot) {
 			if (snapshot.val() === null) {
-				console.log("User is entirely new");
+				console.log("User is new");
 				firebase.database().ref('users/'+user.uid).set({
 					name: user.displayName,
 					email: user.email,
@@ -202,12 +202,15 @@ class Home extends React.Component {
 			return (<Domain name={this.state.domain} onLogoutClick={()=>this.props.onLogoutClick()} />)
 		}
 		return (
-			<div className="container">
-				<div id="user_info">
-					<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
-					<h5>{user.email}</h5>
+			<div className="container col-xs-12">
+				<div className="header">
+					<div id="user_info">
+						<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
+						<h5>{user.email}</h5>
+					</div>
 				</div>
-				<div className="col-xs-12 text-center">
+
+				<div className="content text-center">
 					<div id="join_domain_modal" className="modal fade" role="dialog">
 						<div className="modal-dialog">
 							<div className="modal-content">
@@ -226,6 +229,8 @@ class Home extends React.Component {
 							</div>
 						</div>
 					</div>
+					
+
 					<h2 className="title">
 						Welcome to Pupal, {user.displayName} !
 					</h2>
@@ -233,16 +238,19 @@ class Home extends React.Component {
 						<input type="text" className="form-control " placeholder="Enter domain" onChange={this.filterList} />
 						<List domains={this.state.domains} onDomainClick={(domain)=>this.handleDomainClick(domain)} />
 					</div>
-					<button onClick={()=>this.setState({option:2})} className="hostButton btn btn-default">
-						Host a Project
-					</button>
-					<button onClick={()=>this.setState({option:3})} className="profileButton btn btn-default">
-						Go to Profile
-					</button>
-					<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn btn btn-default">
-						Logout
-					</button>
 
+					<div className="user-options">
+						<button onClick={()=>this.setState({option:2})} className="hostButton btn btn-default">
+							Host a Project
+						</button>
+						<button onClick={()=>this.setState({option:3})} className="profileButton btn btn-default">
+							Go to Profile
+						</button>
+						<button onClick={()=>this.props.onLogoutClick()} className="logoutBtn btn btn-default">
+							Logout
+						</button>
+					</div>
+					
 					<HostProject option={this.state.option} />
 					<GoToProfile option={this.state.option} />
 				</div>
