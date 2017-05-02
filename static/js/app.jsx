@@ -70,6 +70,7 @@ class App extends React.Component {
 	}
 }
 
+// Login page
 class Login extends React.Component {
 	render() {
 		return (
@@ -90,6 +91,7 @@ class Login extends React.Component {
 	}
 }
 
+// List of button display
 function List(props) {
 	return (
 		<div className="list-group" key="domain_listing">
@@ -99,6 +101,29 @@ function List(props) {
 					{item}
 				</button>)
 		}
+		</div>
+	);
+}
+
+function ModalDialog(props) {
+	return (
+		<div id={props.id} className="modal fade" role="dialog">
+			<div className="modal-dialog">
+				<div className="modal-content">
+					<div className="modal-header">
+						<button type="button" className="close" data-dismiss="modal">&times;</button>
+						<h4 className="modal-title">{props.title}</h4>
+					</div>
+					<div className="modal-body">
+						<p>
+							{props.body}
+						</p>
+					</div>
+					<div className="modal-footer">
+						<button type="button" className="btn btn-default" data-dismiss="modal">Close</button>
+					</div>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -129,15 +154,6 @@ class Home extends React.Component {
 					'Authorization', token);},
 				success: (res) => setDomains(res)
 			});
-			/*
-			$.ajax({
-				url:"/users/registerDomain",
-				type: "POST",
-				beforeSend: function(xhr){xhr.setRequestHeader(
-					'Authorization', token);},
-				success: (res) => regUser(res)
-			});
-			*/
 		});
 	}
 	componentDidMount() {
@@ -183,6 +199,7 @@ class Home extends React.Component {
 		});
 	}
 	handleDomainClick(domain) {
+		console.log("Mounting Domain")
 		this.setState({option:1, domain:domain});
 	}
 	filterList(event) {
@@ -199,47 +216,40 @@ class Home extends React.Component {
 	render() {
 		var user = firebase.auth().currentUser;
 		if (this.state.option === 1) {
-			return (<Domain name={this.state.domain} onLogoutClick={()=>this.props.onLogoutClick()} />)
+			return <Domain name={this.state.domain} onLogoutClick={()=>this.props.onLogoutClick()} />
 		}
 		return (
-			<div className="container col-xs-12">
-				<div className="header">
-					<div id="user_info">
-						<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
-						<h5>{user.email}</h5>
-					</div>
-				</div>
-
-				<div className="content text-center">
-					<div id="join_domain_modal" className="modal fade" role="dialog">
-						<div className="modal-dialog">
-							<div className="modal-content">
-								<div className="modal-header">
-									<button type="button" className="close" data-dismiss="modal">&times;</button>
-									<h4 className="modal-title">Looks like you need to join a Pupal domain!</h4>
-								</div>
-								<div className="modal-body">
-									<p>
-										Your domain can be your school, university, group and/or organization.<br /><br />Pupal associates your projects to your domain(s) while allowing you to subscribe to<br />people and projects from other domains for notifications and updates.
-									</p>
-								</div>
-								<div className="modal-footer">
-									<button type="button" className="btn btn-default" data-dismiss="modal">Close</button>
-								</div>
-							</div>
+			<div className="container">
+				<nav className="navbar navbar-default">
+					<div className="container-fluid">
+						<div className="navbar-header">
+							<a className="navbar-brand" href="#">Pupal</a>
+						</div>
+						<div className="navbar-collapse collapse">
+							<ul className="nav navbar-nav navbar-right">
+								<li className="active"><a href="/">Home</a></li>
+								<li><a href="#">About</a></li>
+								<li><a href="#">Contact</a></li>
+								<img className="user-pic" src={user.photoURL} alt="User"></img>
+							</ul>
 						</div>
 					</div>
+				</nav>
 					
-
-					<h2 className="title">
+				<div className="content">
+					<ModalDialog id="join_domain_modal" title="Looks like you need to join a Pupal domain!" body="Your domain can be your school, university, group and/or organization.<br /><br />Pupal associates your projects to your domain(s) while allowing you to subscribe to<br />people and projects from other domains for notifications and updates."/>
+					<h2 className="title col-xs-8">
 						Welcome to Pupal, {user.displayName} !
 					</h2>
-					<div className="filtered-list md-form">
+					<div className="filtered-list md-form col-xs-4">
 						<input type="text" className="form-control " placeholder="Enter domain" onChange={this.filterList} />
 						<List domains={this.state.domains} onDomainClick={(domain)=>this.handleDomainClick(domain)} />
 					</div>
+					
+					<div className="domain-container">
+					</div>
 
-					<div className="user-options">
+					<div className="user-options text-center">
 						<button onClick={()=>this.setState({option:2})} className="hostButton btn btn-default">
 							Host a Project
 						</button>
@@ -259,29 +269,7 @@ class Home extends React.Component {
 	}
 }
 
-/*
-function DisplayMemberPhotoPanel(props) {
-	return (
-		<div className="members-panel panel panel-default col-xs-6">
-			<div className="panel-body">
-				{(props.members !== null) ? (
-					<h5><i>{props.members.length} members.</i></h5>
-					<div className="photoPanel">
-					{
-					props.members.map((item) => 
-						<img className="super-little-rcorner-img img-fluid" src={item.photo}>
-					)
-					}
-					</div>
-				) : (
-					<h5><i>No members yet. Join or refer someone to join!</i></h5>
-				)}
-			</div>
-		</div>
-	);
-}
-*/
-
+// Display little photos
 function DisplayPhotoPanel(props) {
 	return (
 		<div className="photo_array">
@@ -302,7 +290,6 @@ function DisplayMemberPhotoPanel(props) {
 						<h5><i>{props.members.length} member(s).</i></h5>
 						<DisplayPhotoPanel users={props.members} />
 					</div>
-
 				) : (
 					<h5><i>No members yet. Join or refer someone to join!</i></h5>
 				)}
@@ -399,12 +386,8 @@ class Domain extends React.Component {
 	render() {
 		var user = firebase.auth().currentUser;
 		return (
-			<div className="container">
-				<div id="user_info">
-					<img src={user.photoURL} id="user-photo" className="img-fluid"></img>
-					<h5>{user.email}</h5>
-				</div>
-				<div className="col-xs-12 text-center domain-info">
+			<div className="container col-xs-12">
+				<div className="content text-center">
 					<div className="domain-img">
 						<img src={this.state.photo} className="little-round-image img-fluid"></img>
 					</div>
@@ -427,7 +410,6 @@ class Domain extends React.Component {
 
 				<DisplayMemberPhotoPanel members={this.state.members} />
 				<DisplaySubscriberPhotoPanel subscribers={this.state.subscribers} />
-				
 			</div>
 		)
 	}

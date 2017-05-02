@@ -1,5 +1,4 @@
 /* Shared */
-
 html {
 	position: relative;
 	min-height: 100%;
@@ -86,35 +85,38 @@ body {
 }
 
 /* Home */
-.user_info {
-	position: relative;
+
+.navbar-brand {
+	display:flex;
+	align-items: center;
 }
-#user-photo {
+.navbar-brand .title {
+	font-size: 2.5em;
+}
+.user-pic {
+	margin: 5px 10px 5px 10px;
 	border-radius: 50%;
 	height: auto;
 	width: auto;
-	max-width: 50px;
-	max-height: 50px;
-	position: absolute;
-	top: 10px;
-	right: 10px;
+	max-width: 40px;
+	max-height: 40px;
 }
 .little-round-image {
 	display: block;
 	margin-left: auto;
 	margin-right: auto;
 	border-radius: 50%;
-	height: auto;
-	width: auto;
-	max-width: 100px;
-	max-height: 100px;
+	height: 100px;
+	width: 100px;
 	position: relative;
 }
 .super-little-rcorner-image {
 	border-radius: 12px;
 	height: auto;
 	width: auto;
-	max-width: 30px;
 	max-height: 30px;
+	max-width: 30px;
 	position: relative;
+	display: inline-block;
+	padding-left: 5px;
 }
