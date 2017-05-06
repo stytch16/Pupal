@@ -7,14 +7,15 @@ import (
 )
 
 type User struct {
-	Key      *datastore.Key   `json:"id" datastore:"-"`
-	Name     string           `json:"name"`
-	Email    string           `json:"email"`
-	Photo    string           `json:"photo"`
-	Domains  []string         `json:"domain"`
-	Summary  string           `json:"summary"`
-	Skills   []string         `json:"skills"`
-	Projects []*datastore.Key `json:"projects"` // keys of hosted projects
+	Key           *datastore.Key   `json:"id" datastore:"-"`
+	Name          string           `json:"name"`
+	Email         string           `json:"email"`
+	Photo         string           `json:"photo"`
+	Summary       string           `json:"summary"`
+	Skills        []string         `json:"skills"`
+	Domains       []string         `json:"domains"`
+	Subscriptions []string         `json:"subscriptions"`
+	Projects      []*datastore.Key `json:"projects"` // keys of hosted projects
 }
 
 type Project struct {
@@ -22,6 +23,7 @@ type Project struct {
 	Author      *datastore.Key   `json:"author"`
 	Title       string           `json:"title"`
 	Description string           `json:"description"`
+	Domain      string           `json:"domain"`
 	CreatedAt   time.Time        `json:"created_at"`
 	Updates     []Update         `json:"updates"` // Can only be configured by project's host
 	Comments    []Comment        `json:"comments"`
@@ -37,6 +39,7 @@ type Domain struct {
 	PhotoURL    string           `json:"photo_url"`
 	Comments    []Comment        `json:"comments"`
 	Subscribers []*datastore.Key `json:"subscribers"`
+	Projects    []*datastore.Key `json:"projects"`
 }
 
 type Update struct {

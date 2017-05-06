@@ -40,7 +40,6 @@ func init() {
 	projectRouter.HandleFunc("/{id}/subscribe", ProjectSubsHandler).Methods("POST")
 
 	// Host project handlers
-	projectRouter.HandleFunc("/host", ProjectHostHandler).Methods("GET")
 	projectRouter.HandleFunc("/host", ProjectHostPostHandler).Methods("POST")
 
 	// Project routes middleware

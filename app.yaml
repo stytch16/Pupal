@@ -1,4 +1,5 @@
 # goapp deploy -application [PROJECT_ID] -version [V_ID]
+# gcloud app deploy
 runtime: go
 api_version: go1
 
