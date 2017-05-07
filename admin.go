@@ -26,6 +26,7 @@ func AdminAddDomainHandler(w http.ResponseWriter, r *http.Request) {
 		domain.Description, _ = jsonparser.GetString(value, "description")
 		domain.PhotoURL, _ = jsonparser.GetString(value, "photo_url")
 		domain.Name, domain.Description, domain.PhotoURL = strings.TrimSpace(domain.Name), strings.TrimSpace(domain.Description), strings.TrimSpace(domain.PhotoURL)
+		domain.Subscribers = make([]*datastore.Key, 0)
 
 		if _, err := datastore.Put(c, datastore.NewKey(c, "Domain", domain.Name, 0, nil), &domain); err != nil {
 			w.WriteHeader(500)
@@ -42,5 +43,4 @@ func AdminGetUsersHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println("Error retrieving all pupal users: ", err)
 	}
-	w.WriteHeader(200)
 }

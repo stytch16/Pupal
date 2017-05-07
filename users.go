@@ -22,11 +22,15 @@ func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u User
+	var u PupalUser
 	json.Unmarshal(body, &u)
-	key := datastore.NewKey(c, "User", uid, 0,
-		datastore.NewKey(c, "Domain", "~pupal", 0, nil))
+	u.Domains = make([]*datastore.Key, 0)
+	u.Subscriptions = make([]*datastore.Key, 0)
+	u.Skills = make([]string, 0)
+	u.Projects = make([]*datastore.Key, 0)
 
+	key := datastore.NewKey(c, "PupalUser", uid, 0,
+		datastore.NewKey(c, "Domain", "~pupal", 0, nil))
 	if _, err := datastore.Put(c, key, &u); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("Failed to put user into domain, %v\n", err)

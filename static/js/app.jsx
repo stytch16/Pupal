@@ -4,7 +4,8 @@ class App extends React.Component {
 		this.state = {
 			loggedIn: null,
 			option: 0, // menu option: 0->Home, 1->Domain
-			domain: null // domain entered
+			domain: null, // domain entered
+			projectId: null // project id entered
 		};
 	}
 	componentWillMount() {
@@ -64,13 +65,19 @@ class App extends React.Component {
 		}
 	}
 	handleDomainClick(domain) {
-		console.log("Entering " + domain);
 		this.setState({option: 1, domain: domain});
 	}
+	// option : 2 for profile
 	handleHostProjectClick(domain) {
-		console.log("Hosting a project at " + domain);
 		this.setState({option: 3, domain: domain});
 	}
+	handleProjectPageClick(id) {
+		this.setState({option: 4, projectId: id});
+	}
+	handleBrowseProjectClick(domain) {
+		this.setState({option: 5, domain: domain});
+	}
+
 	// App render
 	render() {
 		console.log("Option = ", this.state.option);
@@ -81,7 +88,7 @@ class App extends React.Component {
 					<div className="navbar navbar-default" role="navigation">
 						<div className="container-fluid">
 							<div className="navbar-header">
-								<button className="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse"><span className="sr-only">Toggle navigation</span><span className="icon-bar"></span><span className="icon-bar"></span><span className="icon-bar"></span></button><a rel="nofollow" rel="noreferrer"className="navbar-brand" href="#">Pupal</a>
+								<button className="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse"><span className="sr-only">Toggle navigation</span><span className="icon-bar"></span><span className="icon-bar"></span><span className="icon-bar"></span></button><a rel="nofollow" rel="noreferrer"className="navbar-brand">Pupal</a>
 							</div>
 							<div className="navbar-collapse collapse">
 								<ul className="nav navbar-nav navbar-right">
@@ -97,10 +104,13 @@ class App extends React.Component {
 							</div>
 						</div>
 					</div>
+
 					{this.state.option === 0 && <Home onDomainClick={(domain)=>this.handleDomainClick(domain)} />}
-					{this.state.option === 1 && <Domain name={this.state.domain} onHostProjectClick={(domain)=>this.handleHostProjectClick(domain)}/>}
+					{this.state.option === 1 && <Domain name={this.state.domain} onHostProjectClick={(domain)=>this.handleHostProjectClick(domain)} onBrowseProjectClick={(domain) => this.handleBrowseProjectClick(domain)} />}
 					{this.state.option === 2 && <Profile /> }
-					{this.state.option === 3 && <HostProject domain={this.state.domain} onBackToDomainClick={(domain)=>this.handleDomainClick(domain)} onProjectPageClick={(id)=>handleProjectPageClick(id)} /> }
+					{this.state.option === 3 && <HostProject domain={this.state.domain} onBackToDomainClick={(domain)=>this.handleDomainClick(domain)} onProjectPageClick={(id)=>this.handleProjectPageClick(id)} /> }
+					{this.state.option === 4 && <Project id={this.state.projectId}/>}
+					{this.state.option === 5 && <BrowseProject domain={this.state.domain}/>}
 				</div>
 			);
 		} else {
@@ -154,9 +164,7 @@ function ModalDialog(props) {
 						<h4 className="modal-title">{props.title}</h4>
 					</div>
 					<div className="modal-body">
-						<p>
-							{props.body}
-						</p>
+						<p>{props.body}</p>
 					</div>
 					<div className="modal-footer">
 						<button type="button" className="btn btn-default" data-dismiss="modal">Close</button>
@@ -206,9 +214,6 @@ class Home extends React.Component {
 			if (snapshot.val() === null) {
 				console.log("User is new");
 				firebase.database().ref('users/'+user.uid).set({
-					name: user.displayName,
-					email: user.email,
-					photo: user.photoURL,
 					domain: false,
 					messages: []
 				});
@@ -325,6 +330,9 @@ class Domain extends React.Component {
 		};
 	}
 	componentDidMount() {
+		$('#member-msg').hide();
+		$('#host-project-btn').hide();
+		$('#subscriber-msg').hide();
 		this.getDomainInfo(this.props.name);
 	}
 	getDomainInfo(name) {
@@ -339,6 +347,15 @@ class Domain extends React.Component {
 				isMember: res.is_member,
 				isSubscriber: res.is_subscriber
 				});
+			if (res.is_member) {
+				$('#member-msg').show();
+				$('#host-project-btn').show();
+				$('#join-btn').hide();
+			}
+			if (res.is_subscriber) {
+				$('#subscriber-msg').show();
+				$('#subscriber-btn').hide();
+			}
 		};
 		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
@@ -352,6 +369,12 @@ class Domain extends React.Component {
 		});
 	}
 	joinDomain(name) {
+		const setMemberState = () => { 
+			$('#member-msg').show();
+			$('#host-project-btn').show();
+			$('#join-btn').hide();
+			this.setState({isMember: true});
+		};
 		var user = firebase.auth().currentUser;
 		console.log("Joining", name);
 		user.getToken(true).then(function(token) {
@@ -362,8 +385,7 @@ class Domain extends React.Component {
 					xhr.setRequestHeader('Authorization', token);
 				},
 				success: () => {
-					console.log("user has joined " + name);
-					$('#joinPopover').popover('show');
+					setMemberState();
 				}
 			});
 		});
@@ -372,7 +394,11 @@ class Domain extends React.Component {
 		});
 	}
 	subscribeDomain(name) {
-		console.log("Subscribing to", name);
+		const setSubscriberState = () => {
+				this.setState({isSubscriber: true})
+				$('#subscriber-msg').show();
+				$('#subscriber-btn').hide();
+		};
 		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
 				url: "/domain/"+name+"/subscribe",
@@ -381,8 +407,7 @@ class Domain extends React.Component {
 					xhr.setRequestHeader('Authorization', token);
 				},
 				success: () => { 
-					console.log("user has subscribed to " + name);
-					$('#subscribePopover').popover('show');
+					setSubscriberState();
 				}
 			});
 		});
@@ -402,12 +427,13 @@ class Domain extends React.Component {
 					<div className="domain-desc">
 						<h5>{this.state.desc}</h5>
 					</div>
-					{ (!this.state.isMember) ? 
-					(<a tabIndex="0" id="joinPopover" className="btn btn-default" role="button" onClick={()=>this.joinDomain(this.props.name)} data-toggle="popover" data-trigger="focus" data-placement="left" data-animation="true" data-content="Success. Host a project!">Join</a>)
-					: (<button onClick={()=>this.props.onHostProjectClick(this.props.name)} className="hostButton btn btn-default">Host a Project</button>)}
-					{ (!this.state.isSubscriber) ?
-					(<a tabIndex="0" id="subscribePopover" className="btn btn-default" role="button" onClick={()=>this.subscribeDomain(this.props.name)} data-toggle="popover" data-trigger="focus" data-placement="bottom" data-animation="true" data-content="Success!">Subscribe</a>)
-					: (null) }
+
+					<div id="member-msg" className="alert alert-success" role="alert"><strong>You are a member of {this.props.name}!</strong> Feel free to host projects here!</div>
+					<div id="subscriber-msg" className="alert alert-success" role="alert"><strong>You are a subscriber to {this.props.name}!</strong> Feel free to comment and browse around!</div>
+					<button id="host-project-btn" onClick={()=>this.props.onHostProjectClick(this.props.name)} className="btn btn-default">Host a Project</button>
+					<button id="join-btn" onClick={()=>this.joinDomain(this.props.name)} className="btn btn-default">Join</button>
+					<button id="subscriber-btn" onClick={()=>this.subscribeDomain(this.props.name)} className="btn btn-default">Subscribe</button>
+					<button id="browse-project-btn" onClick={()=>this.props.onBrowseProjectClick(this.props.name)} className="btn btn-default">Browse Projects</button>
 				</div>
 				<DisplayMemberPhotoPanel members={this.state.members} />
 				<DisplaySubscriberPhotoPanel subscribers={this.state.subscribers} />
@@ -416,16 +442,18 @@ class Domain extends React.Component {
 	}
 }
 
-// Host Project page
+// Host project page
 class HostProject extends React.Component {
 	constructor(props) {
 		super(props);
 		this.state = {
 			title: '', titleFeedback: 'AlphaGo', titleValid: false,
 			description: '', descFeedback: 'An AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', descValid: false,
-			teamSize: '0', teamSizeFeedback: 'Select how big the team will be', teamSizeValid: false,
-			website: '', websiteFeedback: 'https://deepmind.com/research/alphago/  or \'NA\' if you do not have one now', websiteValid: false
+			teamSize: '1-3', teamSizeFeedback: 'Select how big the team will be', teamSizeValid: false,
+			website: '', websiteFeedback: 'https://deepmind.com/research/alphago/  or enter \'NA\' if you do not have one now', websiteValid: false,
+			projectId: null
 		}
+
 		this.handleTitleChange = this.handleTitleChange.bind(this);
 		this.handleDescChange = this.handleDescChange.bind(this);
 		this.handleTeamSizeChange = this.handleTeamSizeChange.bind(this);
@@ -433,7 +461,6 @@ class HostProject extends React.Component {
 		this.url_regex = new RegExp(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
 	}
 	componentDidMount() {
-			$('#success-alert').hide();
 			$('#failure-alert').hide();
 	}
 	handleTitleChange(event) {
@@ -457,8 +484,7 @@ class HostProject extends React.Component {
 		}
 	}
 	handleTeamSizeChange(event) {
-		this.setState({teamSize: event.target.value});
-		this.setState({teamSizeFeedback: 'Got it!', teamSizeValid: true});
+		this.setState({teamSize: event.target.value, teamSizeFeedback: 'Got it!', teamSizeValid: true});
 	}
 	handleWebsiteChange(event) {
 		this.setState({website: event.target.value});
@@ -470,10 +496,32 @@ class HostProject extends React.Component {
 			this.setState({websiteFeedback: 'Website does not look correct. Enter \'NA\' if you do not have one now.', websiteValid: false});
 		}
 	}
-	handleSubmitClick() {
-		if (this.state.titleValid && this.state.descValid && this.state.teamSizeValid && this.state.websiteValid) {
+	handleSubmitClick(dom, titl, desc, ts, web) {
+		const setProject = (res) => {
 			$('#failure-alert').hide();
-			$('#success-alert').show();
+			console.log("Opening project with id = ", res);
+			this.props.onProjectPageClick(res);
+		};
+		if (this.state.titleValid && this.state.descValid && this.state.teamSizeValid && this.state.websiteValid) {
+			console.log("POST to host project handler");
+			firebase.auth().currentUser.getToken(true).then(function(token) {
+				$.ajax({
+					url: "/projects/"+dom+"/host",
+					type: "POST",
+					contentType: "application/json",
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('Authorization', token);
+					},
+					data: JSON.stringify(
+						{
+						title: titl,
+						description: desc,
+						team_size: ts,
+						website: web
+						}),
+					success: (res) => setProject(res)
+				});
+			});
 		} else {
 			$('#failure-alert').show();
 		}
@@ -483,22 +531,14 @@ class HostProject extends React.Component {
 			title: '', titleFeedback: 'AlphaGo', titleValid: false,
 			description: '', descFeedback: 'an AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', descValid: false,
 			teamSize: '0', teamSizeValid: false,
-			website: '', websiteFeedback: 'https://deepmind.com/research/alphago/', websiteValid: false
+			website: '', websiteFeedback: 'https://deepmind.com/research/alphago/  or enter \'NA\' if you do not have one now', websiteValid: false
 		});
 		$('#failure-alert').hide();
-		$('#success-alert').hide();
 	}
 	render() {
 		return (
 			<div className="content col-xs-8">
 				<h3 className="title">You are hosting a project at {this.props.domain}! </h3>
-					<div id="success-alert" className="alert alert-success" role="alert">
-						<strong>Well done!</strong> You have successfully submitted a project to {this.props.domain}
-					</div>
-					<div id="failure-alert" className="alert alert-danger" role="alert">
-						<strong>Oh snap!</strong> Change a few things, check your helper text, and try submitting again.
-					</div>
-
 					<form className="col">
 						<div className="form-group">
 							<label htmlFor="titleInput"><h3>Title</h3></label>
@@ -527,7 +567,6 @@ class HostProject extends React.Component {
 							<select value={this.state.teamSize} 
 								onChange={this.handleTeamSizeChange} 
 								className="form-control" id="teamSizeInput">
-								<option value="1">1</option>
 								<option value="1-3">1-3</option>
 								<option value="3-5">3-5</option>
 								<option value="5-10">5-10</option>
@@ -547,15 +586,92 @@ class HostProject extends React.Component {
 								{this.state.websiteFeedback}</p>
 						</div>
 
-						<button onClick={()=>this.handleSubmitClick()} 
-							type="submit" className="btn btn-success">Host my project! Mmhmm!</button>
+						<button onClick={()=>this.handleSubmitClick(this.props.domain, this.state.title, this.state.description, this.state.teamSize, this.state.website)} 
+							type="button" className="btn btn-success">Host my project! Mmhmm!</button>
 						<button onClick={()=>this.handleResetClick()} 
-							type="submit" className="btn btn-warning">Ugh! Start over.</button>
+							type="button" className="btn btn-warning">Ugh! Start over.</button>
 						<button onClick={()=>this.props.onBackToDomainClick(this.props.domain)} 
-							type="submit" className="btn btn-danger">Rut ro. Cancel.</button>
+							type="button" className="btn btn-danger">Rut ro. Cancel.</button>
 
 					</form>
+					<div id="failure-alert" className="alert alert-danger" role="alert">
+						<strong>Oh snap!</strong> Change a few things above, check your helper text, and try submitting again.
+					</div>
 			</div>
+		);
+	}
+}
+
+// Project page
+class Project extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			author: '',
+			title: '',
+			description: '',
+			teamSize: '',
+			website: '',
+			domain: '',
+			createdAt: '',
+			updates: [],
+			comments: [],
+			subscribers: []
+		};
+	}
+	componentDidMount() {
+		this.getProjectInfo(this.props.id);
+	}
+	getProjectInfo(id) {
+		const setStates = (res) => {
+			this.setState({
+				author: res.author.name,
+				title: res.title,
+				description: res.description,
+				teamSize : res.team_size,
+				website: res.website,
+				domain: res.domain.name,
+				createdAt: res.created_at,
+				updates: res.updates,
+				comments: res.comments,
+				subscribers: res.subscribers
+			});
+		}
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/projects/"+id,
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setStates(res)
+			});
+		});
+	}
+	render() {
+		return(
+			<div className="content col-xs-8">
+				<div className="title-header">
+					<h1>{this.state.title}<br/></h1>
+					<p> created by {this.state.author} for {this.state.domain}<br/> </p>
+					<p> {this.state.createdAt} <br/> </p>
+				</div>
+				<div className="description-body">
+					<h4>{this.state.description}<br/></h4>
+					<h4>Team size: {this.state.teamSize} members<br/></h4>
+					<h4>Link to project website: <a href={this.state.website}>{this.state.website}</a></h4>
+				</div>
+			</div>
+		);
+	}
+}
+
+class BrowseProject extends React.Component {
+	render() {
+		return (
+		<div className="content">
+			<h1>Show {this.props.domain}'s projects here!</h1>
+		</div>
 		);
 	}
 }

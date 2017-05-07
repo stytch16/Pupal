@@ -6,16 +6,24 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
-type User struct {
+// ~pupal is a special domain where all users are added
+type PupalUser struct {
 	Key           *datastore.Key   `json:"id" datastore:"-"`
 	Name          string           `json:"name"`
 	Email         string           `json:"email"`
 	Photo         string           `json:"photo"`
 	Summary       string           `json:"summary"`
 	Skills        []string         `json:"skills"`
-	Domains       []string         `json:"domains"`
-	Subscriptions []string         `json:"subscriptions"`
-	Projects      []*datastore.Key `json:"projects"` // keys of hosted projects
+	Domains       []*datastore.Key `json:"domains"`       // keys to joined domains
+	Subscriptions []*datastore.Key `json:"subscriptions"` // keys to subscribed domains
+	Projects      []*datastore.Key `json:"projects"`      // keys of hosted projects
+}
+
+type User struct {
+	Key   *datastore.Key `json:"id" datastore:"-"`
+	Name  string         `json:"name"`
+	Email string         `json:"email"`
+	Photo string         `json:"photo"`
 }
 
 type Project struct {
@@ -23,34 +31,35 @@ type Project struct {
 	Author      *datastore.Key   `json:"author"`
 	Title       string           `json:"title"`
 	Description string           `json:"description"`
-	Domain      string           `json:"domain"`
+	TeamSize    string           `json:"team_size"`
+	Website     string           `json:"website"`
+	Domain      *datastore.Key   `json:"domain"`
 	CreatedAt   time.Time        `json:"created_at"`
 	Updates     []Update         `json:"updates"` // Can only be configured by project's host
 	Comments    []Comment        `json:"comments"`
 	Subscribers []*datastore.Key `json:"subscribers"`
 }
 
-// ~pupal is a special domain where all users are added as subscribers.
-// By doing this, Pupal can globally notify users regarding site updates.
 type Domain struct {
 	Key         *datastore.Key   `json:"id" datastore:"-"`
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	PhotoURL    string           `json:"photo_url"`
-	Comments    []Comment        `json:"comments"`
 	Subscribers []*datastore.Key `json:"subscribers"`
-	Projects    []*datastore.Key `json:"projects"`
 }
 
 type Update struct {
-	Line      string    `json:"line"`
-	CreatedAt time.Time `json:"created_at"`
+	Key       *datastore.Key `json:"id" datastore:"-"`
+	Line      string         `json:"line"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type Comment struct {
+	Key        *datastore.Key `json:"id" datastore:"-"`
 	Author     *datastore.Key `json:"author"`
 	Line       string         `json:"line"`
 	PublicVote int            `json:"public_vote"` // # upvote - # downvote
+	CreatedAt  time.Time      `json:"created_at"`
 }
 
 // Question & Answer.

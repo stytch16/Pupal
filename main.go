@@ -35,12 +35,12 @@ func init() {
 
 	// Project handlers
 	projectRouter := mux.NewRouter().PathPrefix("/projects").Subrouter()
-	projectRouter.HandleFunc("/{id}", ProjectHandler).Methods("GET")
+	projectRouter.HandleFunc("/{id}", ProjectGetHandler).Methods("GET")
 	projectRouter.HandleFunc("/{id}/comment", ProjectCommentHandler).Methods("POST")
 	projectRouter.HandleFunc("/{id}/subscribe", ProjectSubsHandler).Methods("POST")
 
 	// Host project handlers
-	projectRouter.HandleFunc("/host", ProjectHostPostHandler).Methods("POST")
+	projectRouter.HandleFunc("/{domain}/host", ProjectHostPostHandler).Methods("POST")
 
 	// Project routes middleware
 	r.PathPrefix("/projects").Handler(common.With(negroni.Wrap(projectRouter)))
