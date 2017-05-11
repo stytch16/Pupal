@@ -91,6 +91,13 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 	domain := mux.Vars(r)["domain"]
 	uid := context.Get(r, "UID").(string)
 
+	dKey, err := datastore.DecodeKey(domain)
+	if err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to decode the domain id in the url: ", err)
+		return
+	}
+
 	var proj Project
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -101,12 +108,11 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(body, &proj)
 
 	// Add the new project as descendant to Domain with random generated key.
-	proj.Key = datastore.NewIncompleteKey(c, "Project", datastore.NewKey(c, "Domain", domain, 0, nil))
+	proj.Key = datastore.NewIncompleteKey(c, "Project", dKey)
 
 	var pu PupalUser
 	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
 
-	dKey := datastore.NewKey(c, "Domain", domain, 0, nil)
 	proj.Author, proj.Domain, proj.CreatedAt = pu.Key, dKey, time.Now()
 	proj.Comments = make([]Comment, 0)
 	proj.Updates = make([]Update, 0)
