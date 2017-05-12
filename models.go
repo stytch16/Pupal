@@ -30,6 +30,7 @@ type Project struct {
 	Key         *datastore.Key   `json:"id" datastore:"-"`
 	Author      *datastore.Key   `json:"author"`
 	Title       string           `json:"title"`
+	Tags        []string         `json:"tags"`
 	Description string           `json:"description"`
 	TeamSize    string           `json:"team_size"`
 	Website     string           `json:"website"`

@@ -59,7 +59,9 @@ func init() {
 	// Domain handlers
 	domainRouter := mux.NewRouter().PathPrefix("/domain").Subrouter()
 	domainRouter.HandleFunc("/list", DomainListHandler).Methods("GET")
+	domainRouter.HandleFunc("/userlist", DomainUserListHandler).Methods("GET")
 	domainRouter.HandleFunc("/{id}", DomainGetHandler).Methods("GET")
+	domainRouter.HandleFunc("/{id}/projectlist", DomainProjectListHandler).Methods("GET")
 	domainRouter.HandleFunc("/{id}/join", DomainJoinHandler).Methods("GET")
 	domainRouter.HandleFunc("/{id}/subscribe", DomainSubsHandler).Methods("GET")
 

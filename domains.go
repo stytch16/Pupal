@@ -28,24 +28,56 @@ func DomainListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doms := make([]d, len(keys))
-	var dom d
 	for i, domain := range domains {
-		dom.Id = keys[i].Encode()
-		dom.Name = domain.Name
-		doms[i] = dom
+		doms[i].Id, doms[i].Name = keys[i].Encode(), domain.Name
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(&doms); err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to encode json:", err)
+		return
+	}
+}
+
+func DomainUserListHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	uid := context.Get(r, "UID").(string)
+
+	var pu PupalUser
+	if err := datastore.Get(c, datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil)), &pu); err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to get the pupal user:", err)
+		return
+	}
+
+	domains := make([]Domain, len(pu.Domains))
+	if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to get domains of pupal user:", err)
+		return
+	}
+
+	type d struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+	userDoms := make([]d, len(domains))
+	for i, domain := range domains {
+		userDoms[i].Id, userDoms[i].Name = pu.Domains[i].Encode(), domain.Name
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(&userDoms); err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to encode the user domains in json: ", err)
+		return
 	}
 }
 
 func DomainGetHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	id := mux.Vars(r)["id"]
-	//uid := context.Get(r, "UID").(string)
 
 	// Get domain
 	var domain Domain
@@ -119,6 +151,44 @@ func DomainGetHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(&d); err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to encode json:", err)
+	}
+}
+
+func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	id := mux.Vars(r)["id"]
+
+	dKey, err := datastore.DecodeKey(id)
+	if err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to decode the domain key provided in url:", err)
+	}
+
+	var dProjs []Project
+	projKeys, err := datastore.NewQuery("Project").Ancestor(dKey).Order("-CreatedAt").Limit(10).GetAll(c, &dProjs)
+	if err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to get descendent projects of ancestor domain:", err)
+	}
+
+	type d struct {
+		Id            string   `json:"id"`
+		Title         string   `json:"title"`
+		Tags          []string `json:"tags"`
+		NumSubscribes int      `json:"num_subscribes"`
+		Date          string   `json:"date"`
+	}
+
+	entries := make([]d, len(dProjs))
+	for i, dp := range dProjs {
+		entries[i].Id, entries[i].Title, entries[i].Tags, entries[i].NumSubscribes, entries[i].Date =
+			projKeys[i].Encode(), dp.Title, dp.Tags, len(dp.Subscribers), dp.CreatedAt.Format("Mon Jan 2, 2006 15:04")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(&entries); err != nil {
+		w.WriteHeader(500)
+		log.Println("Failed to encode the domain project entries into json:", err)
 	}
 }
 

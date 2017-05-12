@@ -38,19 +38,24 @@ body {
 #login-modal .loginmodal-content {
 	text-align: center,
 	padding: 1em;
+	background-color: #e1e5ed;
 }
-#login-modal .login-icon-btn {
+#login-modal .login-icon {
 	width: 12px;
 	height: 12px;
 }
 #login-modal .login-prompt-btn {
-	width: 20em;
+	width: 17em;
 }
 /* end login */
 
 /* begin navbar */
 .navbar-brand {
+	font-weight: bold;
 	align-items: center;
+}
+#header-nav .dropdown-menu {
+	width: 300px;
 }
 #navbar-user-pic {
 	margin: 5px 10px 5px 10px;
@@ -68,9 +73,6 @@ body {
 
 /* begin domain */
 .domain-content .domain-image {
-	/*display: block;
-	margin-left: auto;
-	margin-right: auto;*/
 	margin-right: 10px;
 	border-radius: 50%;
 	height: 100px;
@@ -79,24 +81,28 @@ body {
 }
 /* end domain */
 
-.super-little-rcorner-image {
-	border-radius: 12px;
-	height: auto;
-	width: auto;
-	max-height: 30px;
-	max-width: 30px;
+.projects-content .proj-entry-content {
 	position: relative;
+}
+
+.projects-content .card-title {
+	margin-left: 40px;
+	margin-top: 20px;
+	font-weight: bold;
 	display: inline-block;
-	margin-left: 5px;
 }
 
-.members-panel {
-	height: 200px;
-	display:block;
+.projects-content .card-text {
+	margin-left:40px;
+	margin-bottom: 20px;
 }
 
-.subscribers-panel {
-	height: 200px;
-	display:block;
+.projects-content .num-subscribes-text {
+	position: absolute;
+	top: 20px;
+	right: 40px;
 }
 
+.projects-content .proj-entry-tag {
+	display: inline-block;
+}

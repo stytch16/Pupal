@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/context"
@@ -113,11 +115,19 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 	var pu PupalUser
 	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
 
+	// Extract tags from description
+	proj.Tags = make([]string, 0)
+	for _, tag := range regexp.MustCompile("#[_a-zA-Z0-9/-]+").FindAllString(proj.Description, 3) {
+		proj.Tags = append(proj.Tags, strings.ToLower(strings.TrimPrefix(tag, "#")))
+	}
+
+	// Update default fields
 	proj.Author, proj.Domain, proj.CreatedAt = pu.Key, dKey, time.Now()
 	proj.Comments = make([]Comment, 0)
 	proj.Updates = make([]Update, 0)
 	proj.Subscribers = make([]*datastore.Key, 0)
 
+	// Add the new project
 	projKey, err := datastore.Put(c, proj.Key, &proj)
 	if err != nil {
 		w.WriteHeader(500)

@@ -87,7 +87,10 @@ function requireAuth(nextState, replace) {
 // begin login function component
 class Login extends React.Component{
 	componentDidMount() {
-		$('#login-modal').modal('toggle')
+		$('#login-modal').modal({
+			backdrop: 'static',
+			keyboard: false
+		}, 'toggle')
 	}
 	render () {
 		return (
@@ -101,7 +104,7 @@ class Login extends React.Component{
 						<div className="modal-body">
 							<div className="btn-group">
 								<a className="btn btn-danger disabled">
-									<i className="fa fa-google login-icon-btn"></i></a>
+									<i className="fa fa-google login-icon"></i></a>
 								<a className="btn btn-danger login-prompt-btn"
 									data-dismiss="modal"
 									onClick={()=>this.props.onGoogleClick()}>
@@ -110,7 +113,7 @@ class Login extends React.Component{
 							<br/><br/>
 							<div className="btn-group">
 								<a className="btn btn-primary disabled">
-									<i className="fa fa-facebook login-icon-btn"></i></a>
+									<i className="fa fa-facebook login-icon"></i></a>
 								<a className="btn btn-primary login-prompt-btn"
 									data-dismiss="modal"
 									onClick={()=>this.props.onFacebookClick()}>
@@ -131,7 +134,7 @@ class Login extends React.Component{
 function Navbar(props) {
 	var user = firebase.auth().currentUser
 	return (
-		<nav className="navbar navbar-default navbar-static-top" role="navigation">
+		<nav id="header-nav" className="navbar navbar-default navbar-static-top" role="navigation">
 			<div className="container-fluid">
 				<div className="navbar-header">
 					<button className="navbar-toggle collapsed" type="button" data-toggle="collapse" 
@@ -150,6 +153,7 @@ function Navbar(props) {
 								aria-haspopup="true" aria-expanded="false">
 								Domains<span className="caret"></span></a>
 							<ul className="dropdown-menu">
+								<UserDomains />
 							</ul>
 						</li>
 						<li><Link to="/profile">Profile</Link></li>
@@ -162,6 +166,42 @@ function Navbar(props) {
 	)
 }
 // end navbar function component
+
+// begin user domains component
+class UserDomains extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			domains: null
+		};
+	}
+	componentDidMount() {
+		const setDomains = (res) => { this.setState({domains: res}) }
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/userlist",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setDomains(res)
+			});
+			
+		});
+	}
+	render() {
+		return (
+			<div className="user-domain-listing-content">
+				{(this.state.domains !== null && this.state.domains.length > 0) ? (
+					<List domains={this.state.domains}/>
+				) : (
+					<p>You have no domains!</p>
+				)}
+			</div>
+		)
+	}
+}
+// end user domains component
 
 // begin home component
 class Home extends React.Component {
@@ -176,12 +216,7 @@ class Home extends React.Component {
 	componentDidMount() {
 		var user = firebase.auth().currentUser;
 
-		const setDomains = (res) => {
-			 this.setState({
-				 initialDomains: res
-			 });
-		};
-
+		const setDomains = (res) => { this.setState({initialDomains: res}); }
 		// Get JSON array of id:name pairs of domain listing
 		user.getToken(true).then(function(token) {
 			$.ajax({
@@ -193,6 +228,7 @@ class Home extends React.Component {
 			});
 		});
 
+		const welcomeNewUser = () => { $('#welcome-pupal-modal').modal('toggle'); }
 		// Read user's record on firebase db. 
 		// If nonexistent, register pupal user on GAE datastore.
 		// If exist but no associated domain, show modal dialog to user to join a domain.
@@ -215,15 +251,11 @@ class Home extends React.Component {
 							photo: user.photoURL
 							}),
 						beforeSend: function(xhr) {
-							xhr.setRequestHeader('Authorization', token);
-							},
-						success: () => {$('#absent-domain-modal').modal('toggle')}
+							xhr.setRequestHeader('Authorization', token); },
+						success: () => welcomeNewUser()
 					});
 				});
-			} else if (snapshot.val().domain === false) {
-				console.log("User has no domain but is already a Pupal user");
-				$('#absent-domain-modal').modal('toggle'); 
-			}
+			} 
 		});
 	}
 	filterList(event) {
@@ -240,8 +272,8 @@ class Home extends React.Component {
 	render() {
 		var user = firebase.auth().currentUser;
 		return (
-			<div className="content">
-				<AbsentDomain />
+			<div className="home-content">
+				<WelcomePupal />
 				<div className="recent-activity-content col-xs-8">
 					<h3>Recent Activity</h3>
 				</div>
@@ -275,21 +307,21 @@ function List(props) {
 }
 // end list function component
 
-// begin absentdomain function component
-function AbsentDomain() {
+// begin welcomepupal component
+function WelcomePupal() {
 	return (
-		<div id="absent-domain-model" className="modal fade" role="dialog">
+		<div id="welcome-pupal-modal" className="modal fade" role="dialog">
 			<div className="modal-dialog">
-				<div className="modal-content">
+				<div className="modal-content text-center">
 					<div className="modal-header">
 						<button type="button" className="close" data-dismiss="modal">&times;</button>
 						<h4 className="modal-title">
-							Looks like you need to join a domain!</h4>
+							Welcome to Pupal! To get started, join a domain!</h4>
 					</div>
 					<div className="modal-body">
 						<p>
-							Your domain can be your school, university, group and/or organization.<br/>
-							Search for your domain and join to start hosting your own projects!</p>
+							Your domain can be your school, group and/or organization.<br/>
+							Search for your domain on the right of the page and join!</p>
 					</div>
 					<div className="modal-footer">
 						<button type="button" className="btn btn-default" data-dismiss="modal">
@@ -300,7 +332,7 @@ function AbsentDomain() {
 		</div>
 	);
 }
-// end absentdomain component
+// end welcomepupal component
 
 // begin domain component
 class Domain extends React.Component {
@@ -374,6 +406,7 @@ class Domain extends React.Component {
 		return (
 			<div className="domain-content">
 				<div className="domain-header">
+					<br/>
 					<h1>
 						<img src={this.state.domain.photo_url} className="domain-image img-fluid"></img>
 						<br/>
@@ -485,11 +518,53 @@ class Info extends React.Component {
 
 // begin projects component
 class Projects extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			projects: []
+		};
+	}
+	componentDidMount() {
+		this.getProjects(this.props.id)
+	}
+	getProjects(id) {
+		const setProjects = (res) => { this.setState({ projects: res }) }
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/domain/"+id+"/projectlist",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setProjects(res)
+			});
+			
+		});
+	}
+	handleProjClick(id) {
+	}
 	render() {
 		return (
-		<div className="projects-content">
-			<h2>Display domain of id={this.props.id} projects here!</h2>
-		</div>
+			<div className="projects-content">
+				<div className="project-group" key="projects-listing">
+				{
+					this.state.projects.map((proj) => 
+						<a className="proj-entry" onClick={()=>this.handleProjClick(proj.id)} key={proj.id}>
+						<div className="card proj-entry-content">
+							<div className="card-block">
+								<h3 className="card-title">{proj.title}</h3>
+								<div className="card-text">
+									<p className="num-subscribes-text"><i>{proj.num_subscribes} subscriber(s)</i></p><br />
+									{proj.tags.map((tag) => 
+									<div className="proj-entry-tag" key={tag}>
+									<p><i className="fa fa-tag" aria-hidden="true"></i>{tag}</p></div> )}
+								</div>
+							</div>
+						</div>
+					</a>)
+				}
+				</div>
+			</div>
 		);
 	}
 }
@@ -600,7 +675,7 @@ class Host extends React.Component {
 		})
 	}
 	fetchNewProjLink(id) {
-		return "/dom/"+id+"/proj/"+this.state.projId
+		return "/dom/"+id+"?view=Projects"
 	}
 	render() {
 		return (
@@ -671,7 +746,7 @@ class Host extends React.Component {
 				<div id="success-alert" className="alert alert-success" role="alert">
 					<h4><strong>Excellent!  </strong>
 						<Link to={this.fetchNewProjLink(this.props.id)}>
-							Click here to check out your project!
+							Click here to check out your project at the project page!
 						</Link></h4>
 				</div>
 			</div>
