@@ -162,6 +162,8 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to decode the domain key provided in url:", err)
+		w.Write([]byte("Failed to decode the domain key provided in url: " + err.Error()))
+		return
 	}
 
 	var dProjs []Project
@@ -169,6 +171,8 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to get descendent projects of ancestor domain:", err)
+		w.Write([]byte("Failed to get descendent projects of ancestor domain: " + err.Error()))
+		return
 	}
 
 	type d struct {
@@ -189,6 +193,8 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(&entries); err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to encode the domain project entries into json:", err)
+		w.Write([]byte("Failed to encode the domain project entries into json: " + err.Error()))
+		return
 	}
 }
 
