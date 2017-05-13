@@ -3,18 +3,26 @@ html,
 body {
 	height:100%;
 	width:100%;
+	font-family: 'Raleway', sans-serif;
 }
 #app {
 	min-height: 100%;
 	height: auto;
-	margin: 0 auto -60px;
+	margin: 0 auto -100px;
 	padding: 0 0 60px;
 }
+.content {
+	padding-top: 80px;
+}
 #footer {
+	margin-top: 50px;
 	width: 100%;
-	height: 60px;
+	height: 100px;
 	background-color: #f5f5f5;
 	text-align: center;
+}
+#footer .social-share-buttons a {
+	margin: 0.5em;
 }
 /* end shared */
 
@@ -27,7 +35,6 @@ body {
 
 /* begin login */
 #pupal-login-image {
-	align-items: center;
 	display: block;
 	margin-left: auto;
 	margin-right: auto;
@@ -40,12 +47,9 @@ body {
 	padding: 1em;
 	background-color: #e1e5ed;
 }
-#login-modal .login-icon {
-	width: 12px;
-	height: 12px;
-}
+
 #login-modal .login-prompt-btn {
-	width: 17em;
+	width: 18em;
 }
 /* end login */
 
@@ -53,6 +57,9 @@ body {
 .navbar-brand {
 	font-weight: bold;
 	align-items: center;
+}
+#header-nav {
+	margin-bottom: 30px;
 }
 #header-nav .dropdown-menu {
 	width: 300px;
@@ -81,6 +88,7 @@ body {
 }
 /* end domain */
 
+/* begin projects */
 .projects-content .proj-entry-content {
 	position: relative;
 }
@@ -103,6 +111,45 @@ body {
 	right: 40px;
 }
 
+.projects-content .desc-text {
+	width: 500px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .projects-content .proj-entry-tag {
 	display: inline-block;
 }
+/* end projects */
+
+/* begin projmodal  */
+#proj-modal .modal-header {
+	font-weight: bold;
+}
+
+#proj-modal .modal-body {
+	margin-right: 100px;
+	margin-left: 100px;
+}
+
+#proj-modal .modal-footer {
+	text-align: center;
+}
+
+#proj-modal .modal-title {
+	margin: 50px 50px;
+}
+
+#proj-modal .proj-author-image {
+	display: inline-block;
+	border-radius: 50%;
+	margin: 1em;
+	width: 50px;
+	height: 50px;
+}
+
+#proj-modal .author-info-contact {
+	display: inline-block;
+}
+/* end projmodal */

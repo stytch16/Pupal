@@ -73,17 +73,6 @@ class App extends React.Component {
 }
 // end app component
 
-// begin requireAuth function component for onEnter hooks
-function requireAuth(nextState, replace) {
-	if (!firebase.auth().currentUser) {
-		replace({
-			pathname:'/',
-			state: { nextPathname: nextState.location.pathname }
-		})
-	}
-}
-// end requireAuth function component
-
 // begin login function component
 class Login extends React.Component{
 	componentDidMount() {
@@ -104,7 +93,7 @@ class Login extends React.Component{
 						<div className="modal-body">
 							<div className="btn-group">
 								<a className="btn btn-danger disabled">
-									<i className="fa fa-google login-icon"></i></a>
+									<i className="fa fa-google"></i></a>
 								<a className="btn btn-danger login-prompt-btn"
 									data-dismiss="modal"
 									onClick={()=>this.props.onGoogleClick()}>
@@ -113,7 +102,7 @@ class Login extends React.Component{
 							<br/><br/>
 							<div className="btn-group">
 								<a className="btn btn-primary disabled">
-									<i className="fa fa-facebook login-icon"></i></a>
+									<i className="fa fa-facebook"></i></a>
 								<a className="btn btn-primary login-prompt-btn"
 									data-dismiss="modal"
 									onClick={()=>this.props.onFacebookClick()}>
@@ -134,7 +123,7 @@ class Login extends React.Component{
 function Navbar(props) {
 	var user = firebase.auth().currentUser
 	return (
-		<nav id="header-nav" className="navbar navbar-default navbar-static-top" role="navigation">
+		<nav id="header-nav" className="navbar navbar-default navbar-fixed-top" role="navigation">
 			<div className="container-fluid">
 				<div className="navbar-header">
 					<button className="navbar-toggle collapsed" type="button" data-toggle="collapse" 
@@ -167,7 +156,7 @@ function Navbar(props) {
 }
 // end navbar function component
 
-// begin user domains component
+// begin userdomains component
 class UserDomains extends React.Component {
 	constructor(props) {
 		super(props);
@@ -195,7 +184,7 @@ class UserDomains extends React.Component {
 				{(this.state.domains !== null && this.state.domains.length > 0) ? (
 					<List domains={this.state.domains}/>
 				) : (
-					<p>You have no domains!</p>
+					<a type="button" className="list-group-item disabled">You have no domains.</a>
 				)}
 			</div>
 		)
@@ -211,6 +200,7 @@ class Home extends React.Component {
 			initialDomains: [], // list of all domains
 			filteredDomains: [] // list of updated domains based on user input
 		};
+
 		this.filterList = this.filterList.bind(this);
 	}
 	componentDidMount() {
@@ -272,7 +262,7 @@ class Home extends React.Component {
 	render() {
 		var user = firebase.auth().currentUser;
 		return (
-			<div className="home-content">
+			<div className="content home-content">
 				<WelcomePupal />
 				<div className="recent-activity-content col-xs-8">
 					<h3>Recent Activity</h3>
@@ -404,7 +394,7 @@ class Domain extends React.Component {
 		}
 		var user = firebase.auth().currentUser;
 		return (
-			<div className="domain-content">
+			<div className="content domain-content">
 				<div className="domain-header">
 					<br/>
 					<h1>
@@ -421,7 +411,7 @@ class Domain extends React.Component {
 						onJoinClick={(id)=>this.handleJoin(id)} />
 				</div>
 				<div className="domain-view-content">
-					<DomainView id={this.props.params.id} view={this.props.location.query.view}/>
+					<DomainView id={this.props.params.id} view={this.props.location.query.view} proj={this.props.location.query.proj}/>
 				</div>
 			</div>
 		)
@@ -434,7 +424,7 @@ function DomainView(props) {
 	if (props.view === "Info") {
 		return <Info id={props.id} />
 	} else if (props.view === "Projects") {
-		return <Projects id={props.id} />
+		return <Projects id={props.id} proj={props.proj} />
 	} else if (props.view === "Users") {
 		return <Users id={props.id} />
 	} else if (props.view === "Host") {
@@ -521,11 +511,13 @@ class Projects extends React.Component {
 	constructor(props) {
 		super(props);
 		this.state = {
-			projects: []
+			projects: [],
+			proj: null
 		};
 	}
 	componentDidMount() {
 		this.getProjects(this.props.id)
+		this.getProject(this.props.proj)
 	}
 	getProjects(id) {
 		const setProjects = (res) => { this.setState({ projects: res }) }
@@ -541,27 +533,50 @@ class Projects extends React.Component {
 			
 		});
 	}
-	handleProjClick(id) {
+	getProject(id) {
+		const setProjModal = (res) => { this.setState({proj: res}, ()=>{$("#proj-modal").modal("toggle")}) }
+		if (id !== undefined && id !== null) {
+			firebase.auth().currentUser.getToken(true).then(function(token) {
+				$.ajax({
+					url: "/projects/"+id,
+					type: "GET",
+					beforeSend: function(xhr){
+						xhr.setRequestHeader('Authorization', token);
+					},
+					success: (res) => setProjModal(res)
+				});
+			});
+		}
 	}
 	render() {
 		return (
 			<div className="projects-content">
+				<ProjModal proj={this.state.proj} dom={this.props.id}/>
 				<div className="project-group" key="projects-listing">
 				{
 					this.state.projects.map((proj) => 
-						<a className="proj-entry" onClick={()=>this.handleProjClick(proj.id)} key={proj.id}>
+					<div className="proj-entry" key={proj.id}>
+						<a onClick={()=>this.getProject(proj.id)}>
 						<div className="card proj-entry-content">
 							<div className="card-block">
 								<h3 className="card-title">{proj.title}</h3>
 								<div className="card-text">
-									<p className="num-subscribes-text"><i>{proj.num_subscribes} subscriber(s)</i></p><br />
-									{proj.tags.map((tag) => 
+									<p className="num-subscribes-text">
+										<i>{proj.num_subscribes} subscriber(s)</i></p>
+									<br />
+									<p className="desc-text">{proj.description}</p>
+									{proj.tags !== null && proj.tags.length > 0 && proj.tags.map((tag) => 
 									<div className="proj-entry-tag" key={tag}>
-									<p><i className="fa fa-tag" aria-hidden="true"></i>{tag}</p></div> )}
+									<p><i className="fa fa-tag" aria-hidden="true"></i>
+										{tag}</p></div>)
+									}
+									<br />
 								</div>
 							</div>
 						</div>
-					</a>)
+						</a>
+					</div>
+					)
 				}
 				</div>
 			</div>
@@ -569,6 +584,51 @@ class Projects extends React.Component {
 	}
 }
 // end projects component
+
+// begin projmodal component
+function ProjModal(props) {
+	function fetchProjLink(dom, proj) {
+		return "/dom/"+dom+"?view=Projects&proj="+proj;
+	}
+	if (props.proj !== null) {
+		return (
+			<div id="proj-modal" className="modal fade" tabIndex="-1" role="dialog" aria-labelledby="proj-modal-label" aria-hidden="true">
+				<div className="modal-dialog modal-lg modal-notify modal-info" role="document">
+					<div className="modal-content">
+						<div className="modal-header text-center">
+							<button type="button" className="close" data-dismiss="modal">&times;</button>
+							<h1 className="modal-title">{props.proj.title}</h1>
+						</div>
+						<div className="modal-body">
+							<div className="desc-header-info">
+								<br />
+								<h5>{props.proj.created_at}<br /></h5>
+								<h4>Team size: {props.proj.team_size}</h4>
+								<br/>
+							</div>
+							<div className="desc-info">
+								<h4>{props.proj.description}</h4>
+								<br/>
+							</div>
+							<div className="author-info">
+								<img className="proj-author-image img-fluid" src={props.proj.author.photo} alt={props.proj.author.name}></img>
+								<div className="author-info-contact">
+									<h4>{props.proj.author.name}</h4>
+								</div>
+								<br/><br/>
+							</div>
+						</div>
+						<div className="modal-footer">
+							{(props.proj.website.localeCompare("NA") !== 0) && <a href={props.proj.website} className="proj-website">{props.proj.website}</a>}
+						</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
+	return null
+}
+// end projmodal component
 
 // begin users component
 class Users extends React.Component {
@@ -587,10 +647,17 @@ class Host extends React.Component {
 	constructor(props) {
 		super(props);
 		this.state = {
-			title: '', titleFeedback: 'Example: AlphaGo', titleValid: false,
-			description: '', descFeedback: 'Example: an AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', descValid: false,
-			teamSize: '1-3', teamSizeFeedback: 'Select how big the team will be.', 
-			website: '', websiteFeedback: 'Example: https://deepmind.com/research/alphago/ OR enter \'NA\' if you do not have one now', websiteValid: false,
+			title: '', 
+			titleFeedback: '*Example: AlphaGo', 
+			titleValid: false,
+			description: '', 
+			descFeedback: '*Example: an AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', 
+			descValid: false,
+			teamSize: '1-3', 
+			teamSizeFeedback: '*Select how big the team will be.', 
+			website: '', 
+			websiteFeedback: '*Example: https://deepmind.com/research/alphago/ OR enter \'NA\' if you do not have one now', 
+			websiteValid: false,
 			projId: null
 		}
 		this.handleTitleChange = this.handleTitleChange.bind(this);
@@ -668,14 +735,21 @@ class Host extends React.Component {
 	handleResetClick() {
 		$('#failure-alert').hide();
 		this.setState({
-			title: '', titleFeedback: 'Example: AlphaGo', titleValid: false,
-			description: '', descFeedback: 'Example: an AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', descValid: false,
-			teamSize: '1-3', teamSizeFeedback: 'Select how big the team will be.', 
-			website: '', websiteFeedback: 'Example: https://deepmind.com/research/alphago/ OR enter \'NA\' if you do not have one now', websiteValid: false
+			title: '', 
+			titleFeedback: '*Example: AlphaGo', 
+			titleValid: false,
+			description: '', 
+			descFeedback: '*Example: an AI computer program to play the board game of Go using a Monte Carlo tree search algorithm #machine-learning', 
+			descValid: false,
+			teamSize: '1-3', 
+			teamSizeFeedback: '*Select how big the team will be.', 
+			website: '', 
+			websiteFeedback: '*Example: https://deepmind.com/research/alphago/ OR enter \'NA\' if you do not have one now', 
+			websiteValid: false
 		})
 	}
 	fetchNewProjLink(id) {
-		return "/dom/"+id+"?view=Projects"
+		return "/dom/"+id+"?view=Projects&proj="+this.state.projId
 	}
 	render() {
 		return (
@@ -699,7 +773,7 @@ class Host extends React.Component {
 							className="form-control" id="descriptionInput" 
 							rows="5" 
 							aria-describedby="descriptionHelp" 
-							placeholder="Describe your project and include hashtags to attach!"></textarea>
+							placeholder="Describe your project and include any single-word hashtags to attach (max 5)!"></textarea>
 						<p id="descriptionHelp" className="form-text text-muted">
 							{this.state.descFeedback}</p>
 					</div>
@@ -735,7 +809,7 @@ class Host extends React.Component {
 						<a onClick={()=>this.handleResetClick()} 
 							type="button" className="btn btn-warning">
 							<i className="fa fa-exclamation-triangle" aria-hidden="true"></i>Start over</a>
-						<a type="button" className="btn btn-danger"><Link to="/">
+						<a type="button" className="btn btn-danger"><Link to={this.fetchNewProjLink(this.props.id)}>
 							<i className="fa fa-times" aria-hidden="true"></i>Cancel.</Link></a>
 					</div>
 				</form>
@@ -755,76 +829,11 @@ class Host extends React.Component {
 }
 // end host component
 
-// begin proj component
-class Proj extends React.Component {
-	constructor(props) {
-		super(props);
-		this.state = {
-			author: '',
-			title: '',
-			description: '',
-			teamSize: '',
-			website: '',
-			domain: '',
-			createdAt: '',
-			updates: [],
-			comments: [],
-			subscribers: []
-		};
-	}
-	componentDidMount() {
-		this.getProjectInfo(this.props.id);
-	}
-	getProjectInfo(id) {
-		const setStates = (res) => {
-			this.setState({
-				author: res.author.name,
-				title: res.title,
-				description: res.description,
-				teamSize : res.team_size,
-				website: res.website,
-				domain: res.domain.name,
-				createdAt: res.created_at,
-				updates: res.updates,
-				comments: res.comments,
-				subscribers: res.subscribers
-			});
-		}
-		firebase.auth().currentUser.getToken(true).then(function(token) {
-			$.ajax({
-				url: "/projects/"+id,
-				type: "GET",
-				beforeSend: function(xhr){
-					xhr.setRequestHeader('Authorization', token);
-				},
-				success: (res) => setStates(res)
-			});
-		});
-	}
-	render() {
-		return(
-			<div className="project-content col-xs-8">
-				<div className="title-header">
-					<h1>{this.state.title}<br/></h1>
-					<p> created by {this.state.author} for {this.state.domain}<br/> </p>
-					<p> {this.state.createdAt} <br/> </p>
-				</div>
-				<div className="description-body">
-					<h4>{this.state.description}<br/></h4>
-					<h4>Team size: {this.state.teamSize} members<br/></h4>
-					<h4>Link to project website: <a href={this.state.website}>{this.state.website}</a></h4>
-				</div>
-			</div>
-		);
-	}
-}
-// end proj component
-
 // begin user component
 class User extends React.Component {
 	render() {
 		return (
-			<div className="user-content">
+			<div className="content user-content">
 				<h2>Display user here</h2>
 			</div>
 		)
@@ -836,30 +845,13 @@ class User extends React.Component {
 class Profile extends React.Component {
 	render() {
 		return (
-			<div className="profile_content">
+			<div className="content profile_content">
 				<h2>Display profile here</h2>
 			</div>
 		);
 	}
 }
 // end profile component
-
-class Logout extends React.Component {
-	componentWillMount() {
-		firebase.auth().signOut().then(function() {
-			console.log("User has signed out");
-		}, function(error) {
-			console.log("Error logging user out (" + error.code + "): " + error.message);
-		});
-	}
-	render() {
-		return (
-			<div className="logout-content">
-				<h1>You have signed out</h1>
-			</div>
-		);
-	}
-}
 
 // Firebase config
 var config = {
@@ -876,24 +868,20 @@ console.log("Firebase initialized");
 // React router components
 var { Router,
       Route,
-      IndexLink, // <IndexLink to="/">Home</IndexLink>
       hashHistory,
       Link } = ReactRouter;
 
 // React router config
 // Use this.props.params.id to access URL id parameter.
 // If query string /foo?bar=baz, use this.props.location.query.bar to get value of bar -> baz
+
+// Query options -> dom/:id?view=Info dom/:id?view=Projects dom/:id?view=Projects&proj=<id> dom/:id?view=Users dom/:id?view=Host
 ReactDOM.render((
 	<Router history={hashHistory}>
 		<Route path="/" component={App}>
-			// Query options -> dom/:id?view=Info dom/:id?view=Projects //dom/:id?view=Users //dom/:id?view=Host
-			<Route path="dom/:id" component={Domain}>
-				<Route path="proj/:id" component={Proj}/>
-			</Route>
-
+			<Route path="dom/:id" component={Domain}/>
 			<Route path="user/:id" component={User}/>
 			<Route path="profile" component={Profile}/>
-			<Route path="logout" component={Logout}/>
 		</Route>
 	</Router>),
 	document.getElementById('app')

@@ -178,6 +178,7 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	type d struct {
 		Id            string   `json:"id"`
 		Title         string   `json:"title"`
+		Description   string   `json:"description"`
 		Tags          []string `json:"tags"`
 		NumSubscribes int      `json:"num_subscribes"`
 		Date          string   `json:"date"`
@@ -185,8 +186,12 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 
 	entries := make([]d, len(dProjs))
 	for i, dp := range dProjs {
-		entries[i].Id, entries[i].Title, entries[i].Tags, entries[i].NumSubscribes, entries[i].Date =
-			projKeys[i].Encode(), dp.Title, dp.Tags, len(dp.Subscribers), dp.CreatedAt.Format("Mon Jan 2, 2006 15:04")
+		entries[i].Id = projKeys[i].Encode()
+		entries[i].Title = dp.Title
+		entries[i].Description = dp.Description
+		entries[i].Tags = dp.Tags
+		entries[i].NumSubscribes = len(dp.Subscribers)
+		entries[i].Date = dp.CreatedAt.Format("Mon Jan 2, 2006 15:04 MST")
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -39,40 +39,44 @@ func ProjectGetHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		log.Println("Failed to get author's name:", err)
 	}
-	var domain Domain
-	if err := datastore.Get(c, proj.Domain, &domain); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get the domain:", err)
-	}
-	subscribers := make([]PupalUser, len(proj.Subscribers))
-	if err := datastore.GetMulti(c, proj.Subscribers, subscribers); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get the subscribers:", err)
-	}
+	/*
+		var domain Domain
+		if err := datastore.Get(c, proj.Domain, &domain); err != nil {
+			w.WriteHeader(500)
+			log.Println("Failed to get the domain:", err)
+		}
+		subscribers := make([]PupalUser, len(proj.Subscribers))
+		if err := datastore.GetMulti(c, proj.Subscribers, subscribers); err != nil {
+			w.WriteHeader(500)
+			log.Println("Failed to get the subscribers:", err)
+		}
+	*/
 
 	w.Header().Set("Content-Type", "application/json")
 	d := struct {
-		Author      PupalUser   `json:"author"`
-		Title       string      `json:"title"`
-		Description string      `json:"description"`
-		TeamSize    string      `json:"team_size"`
-		Website     string      `json:"website"`
-		Domain      Domain      `json:"domain"`
-		CreatedAt   string      `json:"created_at"`
-		Updates     []Update    `json:"updates"`
-		Comments    []Comment   `json:"comments"`
-		Subscribers []PupalUser `json:"subscribers"`
+		Id          string    `json:"id"`
+		Author      PupalUser `json:"author"`
+		Title       string    `json:"title"`
+		Description string    `json:"description"`
+		TeamSize    string    `json:"team_size"`
+		Website     string    `json:"website"`
+		// Domain      Domain      `json:"domain"`
+		CreatedAt string   `json:"created_at"`
+		Updates   []Update `json:"updates"`
+		// Comments    []Comment   `json:"comments"`
+		// Subscribers []PupalUser `json:"subscribers"`
 	}{
+		Id:          id,
 		Author:      author,
 		Title:       proj.Title,
 		Description: proj.Description,
 		TeamSize:    proj.TeamSize,
 		Website:     proj.Website,
-		Domain:      domain,
-		CreatedAt:   proj.CreatedAt.Format("Mon Jan 2, 2006 15:04"),
-		Updates:     proj.Updates,
-		Comments:    proj.Comments,
-		Subscribers: subscribers,
+		//Domain:      domain,
+		CreatedAt: proj.CreatedAt.Format("Mon Jan 2, 2006 15:04 MST"),
+		Updates:   proj.Updates,
+		//Comments:    proj.Comments,
+		//Subscribers: subscribers,
 	}
 	if json.NewEncoder(w).Encode(&d); err != nil {
 		w.WriteHeader(500)
@@ -117,7 +121,7 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Extract tags from description
 	proj.Tags = make([]string, 0)
-	for _, tag := range regexp.MustCompile("#[_a-zA-Z0-9/-]+").FindAllString(proj.Description, 3) {
+	for _, tag := range regexp.MustCompile("#[_a-zA-Z0-9/-]+").FindAllString(proj.Description, 5) {
 		proj.Tags = append(proj.Tags, strings.ToLower(strings.TrimPrefix(tag, "#")))
 	}
 
