@@ -175,7 +175,6 @@ class UserDomains extends React.Component {
 				},
 				success: (res) => setDomains(res)
 			});
-			
 		});
 	}
 	render() {
@@ -227,6 +226,7 @@ class Home extends React.Component {
 				console.log("User is new");
 				firebase.database().ref('users/'+user.uid).set({
 					domain: false,
+					email: user.email,
 					messages: []
 				});
 				user.getToken(true).then(function(token) {
@@ -330,10 +330,12 @@ class Domain extends React.Component {
 		super(props);
 		this.state = {
 			domain: null,
+			member: null
 		};
 	}
 	componentDidMount() {
 		this.getDomainInfo(this.props.params.id);
+		this.handleMembership(this.props.params.id);
 	}
 	getDomainInfo(id) {
 		const setStates = (res) => {
@@ -350,30 +352,35 @@ class Domain extends React.Component {
 			});
 		});
 	}
-	handleSubscribe(id) {
-		const setSubscriberState = () => {
-			console.log("New subscriber!")
-		};
+	handleMembership(id) {
+		const setMember = (res) => {
+			if (res === "true") {
+				this.setState({member: true})
+			} else {
+				this.setState({member:false})
+			}
+		}
 		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
-				url: "/domain/"+id+"/subscribe",
+				url: "/domain/"+id+"/member",
 				type: "GET",
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('Authorization', token);
 				},
-				success: () => setSubscriberState()
+				success: (res) => setMember(res)
 			});
 		});
+
 	}
 	handleJoin(id) {
 		const setJoinState = () => { 
-			console.log("New member!")
+			this.setState({member:true})
 		};
 		var user = firebase.auth().currentUser;
 		user.getToken(true).then(function(token) {
 			$.ajax({
 				url: "/domain/"+id+"/join",
-				type: "GET",
+				type: "POST",
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('Authorization', token);
 				},
@@ -406,8 +413,7 @@ class Domain extends React.Component {
 					<br/><br/>
 				</div>
 				<div className="domain-navbar">
-					<DomainNavbar id={this.props.params.id} view={this.props.location.query.view}
-						onSubscribeClick={(id)=>this.handleSubscribe(id)} 
+					<DomainNavbar id={this.props.params.id} view={this.props.location.query.view} member={this.state.member}
 						onJoinClick={(id)=>this.handleJoin(id)} />
 				</div>
 				<div className="domain-view-content">
@@ -473,16 +479,13 @@ class DomainNavbar extends React.Component{
 								aria-haspopup="true" aria-expanded="false">
 								Actions<i className="fa fa-bars" aria-hidden="true"></i></a>
 							<ul className="dropdown-menu">
-								<li><a onClick={()=>this.props.onSubscribeClick(this.props.id)}>
-									<i className="fa fa-bell" aria-hidden="true"></i>
-									Get notifications</a></li>
-								<li role="separator" className="divider"></li>
-								<li><a onClick={()=>this.props.onJoinClick(this.props.id)}>
+								{!this.props.member && <li><a onClick={()=>this.props.onJoinClick(this.props.id)}>
 									<i className="fa fa-tags" aria-hidden="true"></i>
-									Request to join</a></li>
-								<li><Link to={this.fetchViewLink(this.props.id, "Host")}>
+									Request to join</a></li>}
+								<li role="separator" className="divider"></li>
+								{this.props.member && <li><Link to={this.fetchViewLink(this.props.id, "Host")}>
 									<i className="fa fa-paper-plane" aria-hidden="true"></i>
-									Host a project</Link></li>
+									Host a project</Link></li>}
 							</ul>
 						</li>
 					</ul>
@@ -516,8 +519,8 @@ class Projects extends React.Component {
 		};
 	}
 	componentDidMount() {
-		this.getProjects(this.props.id)
-		this.getProject(this.props.proj)
+		this.getProjects(this.props.id) // Get projects of domain id in URL
+		this.getProject(this.props.proj) // Get project of project id in URL if exists
 	}
 	getProjects(id) {
 		const setProjects = (res) => { this.setState({ projects: res }) }
@@ -548,10 +551,29 @@ class Projects extends React.Component {
 			});
 		}
 	}
+	handleProjSubClick(id) {
+		const resetProj = () => { this.getProject(this.props.id) }
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/projects/"+id+"/subscribe",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: () => resetProj()
+			});
+		});
+	}
+	handleUserClick(id) {
+		// Redirect to the user page
+		hashHistory.push("/user/"+id)
+	}
 	render() {
 		return (
 			<div className="projects-content">
-				<ProjModal proj={this.state.proj} dom={this.props.id}/>
+				<ProjModal proj={this.state.proj} 
+					onProjSubClick={()=>this.handleProjSubClick(this.state.proj.id)}
+					onUserClick={(id)=>this.handleUserClick(id)}/>
 				<div className="project-group" key="projects-listing">
 				{
 					this.state.projects.map((proj) => 
@@ -587,17 +609,21 @@ class Projects extends React.Component {
 
 // begin projmodal component
 function ProjModal(props) {
-	function fetchProjLink(dom, proj) {
-		return "/dom/"+dom+"?view=Projects&proj="+proj;
-	}
 	if (props.proj !== null) {
 		return (
-			<div id="proj-modal" className="modal fade" tabIndex="-1" role="dialog" aria-labelledby="proj-modal-label" aria-hidden="true">
+			<div id="proj-modal" className="modal fade" tabIndex="-1" role="dialog" 
+				aria-labelledby="proj-modal-label" aria-hidden="true">
 				<div className="modal-dialog modal-lg modal-notify modal-info" role="document">
 					<div className="modal-content">
 						<div className="modal-header text-center">
-							<button type="button" className="close" data-dismiss="modal">&times;</button>
+							<button type="button" className="close" data-dismiss="modal">&times;
+							</button>
 							<h1 className="modal-title">{props.proj.title}</h1>
+							<button type="button" 
+								className="btn btn-default btn-circle btn-lg"
+								onClick={()=>this.props.onProjSubClick()}>
+							<i className="fa fa-star-o" aria-hidden="true"></i>
+							</button>
 						</div>
 						<div className="modal-body">
 							<div className="desc-header-info">
@@ -611,10 +637,14 @@ function ProjModal(props) {
 								<br/>
 							</div>
 							<div className="author-info">
-								<img className="proj-author-image img-fluid" src={props.proj.author.photo} alt={props.proj.author.name}></img>
-								<div className="author-info-contact">
-									<h4>{props.proj.author.name}</h4>
-								</div>
+								<a onClick={()=>props.onUserClick(props.proj.author.pupal_id)} 
+									data-dismiss="modal" >
+									<img className="proj-author-image img-fluid" 
+										src={props.proj.author.photo} alt={props.proj.author.name}></img>
+									<div className="author-info-contact">
+										<h4>{props.proj.author.name}</h4>
+									</div>
+								</a>
 								<br/><br/>
 							</div>
 						</div>
@@ -658,6 +688,7 @@ class Host extends React.Component {
 			website: '', 
 			websiteFeedback: '*Example: https://deepmind.com/research/alphago/ OR enter \'NA\' if you do not have one now', 
 			websiteValid: false,
+
 			projId: null
 		}
 		this.handleTitleChange = this.handleTitleChange.bind(this);
@@ -753,77 +784,77 @@ class Host extends React.Component {
 	}
 	render() {
 		return (
-			<div className="host-content">
-				<form className="col">
-					<div className="form-group">
-						<label htmlFor="titleInput"><h3>Title</h3></label>
-						<input type="text" 
-							value={this.state.title} 
-							onChange={this.handleTitleChange} 
-							className="form-control" id="titleInput" 
-							aria-describedby="titleHelp" 
-							placeholder="Got a good name for your project?"></input>
-						<p id="titleHelp" className="form-text text-muted">
-							{this.state.titleFeedback}</p>
-					</div>
-					<div className="form-group">
-						<label htmlFor="descriptionInput"><h3>Description</h3></label>
-						<textarea value={this.state.description} 
-							onChange={this.handleDescChange} 
-							className="form-control" id="descriptionInput" 
-							rows="5" 
-							aria-describedby="descriptionHelp" 
-							placeholder="Describe your project and include any single-word hashtags to attach (max 5)!"></textarea>
-						<p id="descriptionHelp" className="form-text text-muted">
-							{this.state.descFeedback}</p>
-					</div>
-					<div className="form-group">
-						<label htmlFor="teamSizeInput"><h3>Size of project team</h3></label>
-						<select value={this.state.teamSize} 
-							onChange={this.handleTeamSizeChange} 
-							className="form-control" id="teamSizeInput">
-							<option value="1-3">1-3</option>
-							<option value="3-5">3-5</option>
-							<option value="5-10">5-10</option>
-							<option value="10+">10+</option>
-						</select>
-						<p id="descriptionHelp" className="form-text text-muted">
-							{this.state.teamSizeFeedback}</p>
-					</div>
-					<div className="form-group">
-						<label htmlFor="websiteInput"><h3>Got a website?</h3></label>
-						<input type="text" 
-							value={this.state.website} 
-							onChange={this.handleWebsiteChange} 
-							className="form-control" id="websiteInput" 
-							placeholder="Got a website for this project?"></input>
-						<p id="websiteHelp" className="form-text text-muted">
-							{this.state.websiteFeedback}</p>
-					</div>
-					<div id="host-submit-buttons">
-						<a onClick={()=>this.handleSubmitClick(
-							this.props.id, this.state.title, this.state.description, 
-							this.state.teamSize, this.state.website)} 
-							type="button" className="btn btn-success">
-							<i className="fa fa-check" aria-hidden="true"></i>Host my project!</a>
-						<a onClick={()=>this.handleResetClick()} 
-							type="button" className="btn btn-warning">
-							<i className="fa fa-exclamation-triangle" aria-hidden="true"></i>Start over</a>
-						<a type="button" className="btn btn-danger"><Link to={this.fetchNewProjLink(this.props.id)}>
-							<i className="fa fa-times" aria-hidden="true"></i>Cancel.</Link></a>
-					</div>
-				</form>
-				<div id="failure-alert" className="alert alert-danger" role="alert">
-					<h4><strong>Oh snap!  </strong>
-						Look at your helper text and try submitting again.</h4>
+		<div className="host-content">
+			<form className="col">
+				<div className="form-group">
+					<label htmlFor="titleInput"><h3>Title</h3></label>
+					<input type="text" 
+						value={this.state.title} 
+						onChange={this.handleTitleChange} 
+						className="form-control" id="titleInput" 
+						aria-describedby="titleHelp" 
+						placeholder="Got a good name for your project?"></input>
+					<p id="titleHelp" className="form-text text-muted">
+						{this.state.titleFeedback}</p>
 				</div>
-				<div id="success-alert" className="alert alert-success" role="alert">
-					<h4><strong>Excellent!  </strong>
-						<Link to={this.fetchNewProjLink(this.props.id)}>
-							Click here to check out your project at the project page!
-						</Link></h4>
+				<div className="form-group">
+					<label htmlFor="descriptionInput"><h3>Description</h3></label>
+					<textarea value={this.state.description} 
+						onChange={this.handleDescChange} 
+						className="form-control" id="descriptionInput" 
+						rows="5" 
+						aria-describedby="descriptionHelp" 
+						placeholder="Describe your project and include any single-word hashtags to attach (max 5)!"></textarea>
+					<p id="descriptionHelp" className="form-text text-muted">
+						{this.state.descFeedback}</p>
 				</div>
+				<div className="form-group">
+					<label htmlFor="teamSizeInput"><h3>Size of project team</h3></label>
+					<select value={this.state.teamSize} 
+						onChange={this.handleTeamSizeChange} 
+						className="form-control" id="teamSizeInput">
+						<option value="1-3">1-3</option>
+						<option value="3-5">3-5</option>
+						<option value="5-10">5-10</option>
+						<option value="10+">10+</option>
+					</select>
+					<p id="descriptionHelp" className="form-text text-muted">
+						{this.state.teamSizeFeedback}</p>
+				</div>
+				<div className="form-group">
+					<label htmlFor="websiteInput"><h3>Got a website?</h3></label>
+					<input type="text" 
+						value={this.state.website} 
+						onChange={this.handleWebsiteChange} 
+						className="form-control" id="websiteInput" 
+						placeholder="Got a website for this project?"></input>
+					<p id="websiteHelp" className="form-text text-muted">
+						{this.state.websiteFeedback}</p>
+				</div>
+				<div id="host-submit-buttons">
+					<a onClick={()=>this.handleSubmitClick(
+						this.props.id, this.state.title, this.state.description, 
+						this.state.teamSize, this.state.website)} 
+						type="button" className="btn btn-success">
+						<i className="fa fa-check" aria-hidden="true"></i>Host my project!</a>
+					<a onClick={()=>this.handleResetClick()} 
+						type="button" className="btn btn-warning">
+						<i className="fa fa-exclamation-triangle" aria-hidden="true"></i>Start over</a>
+					<a type="button" className="btn btn-danger"><Link to={this.fetchNewProjLink(this.props.id)}>
+						<i className="fa fa-times" aria-hidden="true"></i>Cancel</Link></a>
+				</div>
+			</form>
+			<div id="failure-alert" className="alert alert-danger" role="alert">
+				<h4><strong>Oh snap!  </strong>
+					Look at your helper text and try submitting again.</h4>
 			</div>
+			<div id="success-alert" className="alert alert-success" role="alert">
+				<h4><strong>Excellent!  </strong>
+					<Link to={this.fetchNewProjLink(this.props.id)}>
+						Click here to check out your project at the project page!
+					</Link></h4>
+			</div>
+		</div>
 		);
 	}
 }
@@ -831,12 +862,52 @@ class Host extends React.Component {
 
 // begin user component
 class User extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			user: null
+		};
+	}
+	componentDidMount() {
+		this.getPupalUser(this.props.params.id)
+	}
+	getPupalUser(id) {
+		const setUser = (res) => {
+			this.setState({user: res})
+		}
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/users/"+id,
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setUser(res)
+			});
+		});
+	}
 	render() {
-		return (
-			<div className="content user-content">
-				<h2>Display user here</h2>
-			</div>
-		)
+		if (this.state.user) {
+			return (
+				<div className="content user-content">
+					<div className="header">
+						<img id="user-profile-pic" src={this.state.user.photo} alt={this.state.user.name}></img>
+						<h1 id="user-profile-name">{this.state.user.name}</h1>
+					</div>
+					<div className="body col-xs-8">
+						<br /><br />
+						<h4 id="user-profile-summary">{this.state.user.summary}</h4>
+						<br /><br />
+					</div>
+				</div>
+			)
+		} else {
+			return (
+				<div className="content user-content">
+					Loading...
+				</div>
+			)
+		}
 	}
 }
 // end user component

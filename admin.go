@@ -25,12 +25,13 @@ func AdminAddDomainHandler(w http.ResponseWriter, r *http.Request) {
 		domain.Name, _ = jsonparser.GetString(value, "name")
 		domain.Description, _ = jsonparser.GetString(value, "description")
 		domain.PhotoURL, _ = jsonparser.GetString(value, "photo_url")
-		domain.Name, domain.Description, domain.PhotoURL = strings.TrimSpace(domain.Name), strings.TrimSpace(domain.Description), strings.TrimSpace(domain.PhotoURL)
-		domain.Subscribers = make([]*datastore.Key, 0)
+		domain.Public, _ = jsonparser.GetBoolean(value, "public")
+		domain.Name, domain.Description, domain.PhotoURL =
+			strings.TrimSpace(domain.Name), strings.TrimSpace(domain.Description), strings.TrimSpace(domain.PhotoURL)
 
 		if _, err := datastore.Put(c, datastore.NewKey(c, "Domain", domain.Name, 0, nil), &domain); err != nil {
 			w.WriteHeader(500)
-			w.Write([]byte("Failed to store " + domain.Name + " into datastore."))
+			log.Println("Failed to store "+domain.Name+" into datastore:", err)
 		}
 	}, "domains")
 }
@@ -40,7 +41,7 @@ func AdminGetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	var users []User
 	datastore.NewQuery("User").Ancestor(datastore.NewKey(c, "Domain", "~pupal", 0, nil)).GetAll(c, &users)
 	if err := json.NewEncoder(w).Encode(&users); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(500)
 		log.Println("Error retrieving all pupal users: ", err)
 	}
 }

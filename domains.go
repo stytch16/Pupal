@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -12,52 +13,57 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
+// DomainListHandler returns a list of all domains in Pupal in JSON.
+// Independent of pupal user.
 func DomainListHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+
+	// Get all domains
+	var domains []Domain
+	keys, err := datastore.NewQuery("Domain").Filter("Name <", "~").GetAll(c, &domains)
+	if err != nil {
+		NewError(w, 500, "Failed to get list of domain names", err, "DomainListHandler")
+		return
+	}
+
+	// Return id and name of domains in json
 	type d struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
 	}
-	var domains []Domain
-
-	keys, err := datastore.NewQuery("Domain").Filter("Name <", "~").GetAll(c, &domains)
-	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to retrieve a list of domain names:", err)
-		return
-	}
-
 	doms := make([]d, len(keys))
 	for i, domain := range domains {
 		doms[i].Id, doms[i].Name = keys[i].Encode(), domain.Name
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(&doms); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to encode json:", err)
+		NewError(w, 500, "Failed to encode json response", err, "DomainListHandler")
 		return
 	}
 }
 
+// DomainUserListHandler returns a list of the user's domains.
+// Dependent on pupal user.
 func DomainUserListHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	uid := context.Get(r, "UID").(string)
 
-	var pu PupalUser
-	if err := datastore.Get(c, datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil)), &pu); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get the pupal user:", err)
+	// Get pupal user
+	pu := context.Get(r, "PupalUser").(PupalUser)
+
+	// Write nil if pupal user has no domains yet and return
+	if len(pu.Domains) == 0 {
+		w.Write(nil)
 		return
 	}
 
+	// Get domains of pupal user
 	domains := make([]Domain, len(pu.Domains))
 	if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get domains of pupal user:", err)
+		NewError(w, 500, "Failed to get the domains of pupal user", err, "DomainUserListHandler")
 		return
 	}
 
+	// Return id and name of domains in json
 	type d struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
@@ -66,77 +72,32 @@ func DomainUserListHandler(w http.ResponseWriter, r *http.Request) {
 	for i, domain := range domains {
 		userDoms[i].Id, userDoms[i].Name = pu.Domains[i].Encode(), domain.Name
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(&userDoms); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to encode the user domains in json: ", err)
+		NewError(w, 500, "Failed to encode the json response", err, "DomainUserListHandler")
 		return
 	}
 }
 
+// DomainGetHandler returns json data regarding the info view of the domain page.
+// Independent of pupal user.
 func DomainGetHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	id := mux.Vars(r)["id"]
 
-	// Get domain
+	// Get domain from id in url
 	var domain Domain
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to decode the domain id in the url: ", err)
+		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainGetHandler")
 		return
 	}
-	domain.Key = dKey
-	if err := datastore.Get(c, domain.Key, &domain); err != nil {
-		w.WriteHeader(500)
-		log.Printf("Failed to get domain from datastore: %v\n", err)
+	if err := datastore.Get(c, dKey, &domain); err != nil {
+		NewError(w, 500, "Failed to get domain from datastore", err, "DomainGetHandler")
 		return
 	}
 
-	/*
-		// Get pupal user
-		var pu PupalUser
-		pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-		if err = datastore.Get(c, pu.Key, &pu); err != nil {
-			w.WriteHeader(500)
-			log.Println("Failed to get user from ~pupal: ", err)
-			return
-		}
-
-		// Get members -> ancestor query
-		members := make([]User, 0)
-		if _, err := datastore.NewQuery("User").Ancestor(domain.Key).GetAll(c, &members); err != nil {
-			w.WriteHeader(500)
-			log.Printf("Failed to get members of domain = %v: %v\n", name, err)
-			return
-		}
-
-		// Is user a member?
-		ismember := false
-		for _, d := range pu.Domains {
-			if d.Equal(domain.Key) {
-				ismember = true
-			}
-		}
-
-		// Get subscribers
-		subscribers := make([]PupalUser, len(domain.Subscribers))
-		if err := datastore.GetMulti(c, domain.Subscribers, subscribers); err != nil {
-			w.WriteHeader(500)
-			log.Printf("Failed to get subscribers of domain = %v: %v\n", name, err)
-		}
-
-		// Is user a subscriber?
-		issubscriber := false
-		for _, s := range pu.Subscriptions {
-			if s.Equal(domain.Key) {
-				issubscriber = true
-			}
-		}
-	*/
-
-	// Create the JSON
+	// Return name, description, photo url in json
 	w.Header().Set("Content-Type", "application/json")
 	d := struct {
 		Name        string `json:"name"`
@@ -147,34 +108,58 @@ func DomainGetHandler(w http.ResponseWriter, r *http.Request) {
 		Description: domain.Description,
 		PhotoURL:    domain.PhotoURL,
 	}
-
 	if err := json.NewEncoder(w).Encode(&d); err != nil {
 		w.WriteHeader(500)
 		log.Println("Failed to encode json:", err)
 	}
 }
 
+// DomainGetMemberHandler returns true if user is a member of the domain, otherwise false.
+// Dependent on pupal user.
+func DomainGetMemberHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	// Get pupal user
+	pu := context.Get(r, "PupalUser").(PupalUser)
+	// Decode domain key
+	dKey, err := datastore.DecodeKey(id)
+	if err != nil {
+		NewError(w, 500, "Failed to decode id from url", err, "DomainGetMemberHandler")
+		return
+	}
+
+	for _, puDom := range pu.Domains {
+		if puDom.Equal(dKey) {
+			w.Write([]byte("true"))
+			return
+		}
+	}
+	w.Write([]byte("false"))
+}
+
+// DomainProjectListHandler returns a list of project descending from domain.
+// Independent of pupal user.
 func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	id := mux.Vars(r)["id"]
 
+	// Get the domain
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to decode the domain key provided in url:", err)
-		w.Write([]byte("Failed to decode the domain key provided in url: " + err.Error()))
+		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainProjectListHandler")
 		return
 	}
 
+	// Get all projects descending from the domain in order of newest to oldest
 	var dProjs []Project
 	projKeys, err := datastore.NewQuery("Project").Ancestor(dKey).Order("-CreatedAt").Limit(10).GetAll(c, &dProjs)
 	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get descendent projects of ancestor domain:", err)
-		w.Write([]byte("Failed to get descendent projects of ancestor domain: " + err.Error()))
+		NewError(w, 500, "Failed to get the descendant projects from domain", err, "DomainProjectListHandler")
 		return
 	}
 
+	// Return basic data in json
+	w.Header().Set("Content-Type", "application/json")
 	type d struct {
 		Id            string   `json:"id"`
 		Title         string   `json:"title"`
@@ -183,7 +168,6 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 		NumSubscribes int      `json:"num_subscribes"`
 		Date          string   `json:"date"`
 	}
-
 	entries := make([]d, len(dProjs))
 	for i, dp := range dProjs {
 		entries[i].Id = projKeys[i].Encode()
@@ -193,107 +177,64 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 		entries[i].NumSubscribes = len(dp.Subscribers)
 		entries[i].Date = dp.CreatedAt.Format("Mon Jan 2, 2006 15:04 MST")
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(&entries); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to encode the domain project entries into json:", err)
-		w.Write([]byte("Failed to encode the domain project entries into json: " + err.Error()))
+		NewError(w, 500, "Failed to encode project entries into json", err, "DomainProjectListHandler")
 		return
 	}
 }
 
+// DomainJoinHandler handles the case when a user joins a domain.
+// Dependent on pupal user. Also updates pupal user.
 func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	id := mux.Vars(r)["id"] // name of domain
+	id := mux.Vars(r)["id"]
+
+	// Get pupal user
+	pu := context.Get(r, "PupalUser").(PupalUser)
+	// and UID
 	uid := context.Get(r, "UID").(string)
 
 	// Get domain
-	var domain Domain
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to decode the domain id in the url: ", err)
+		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainJoinHandler")
 		return
 	}
-	domain.Key = dKey
-	if err := datastore.Get(c, domain.Key, &domain); err != nil {
-		w.WriteHeader(500)
-		log.Printf("Failed to get domain from datastore: %v\n", err)
-		return
-	}
-
-	// Get the pupal user
-	var pu PupalUser
-	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-	if err = datastore.Get(c, pu.Key, &pu); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get user from ~pupal: ", err)
+	var domain Domain
+	if err := datastore.Get(c, dKey, &domain); err != nil {
+		NewError(w, 500, "Failed to get the domain from the datastore", err, "DomainJoinHandler")
 		return
 	}
 
-	// Put updated user back into ~pupal
-	pu.Domains = append(pu.Domains, domain.Key)
+	// Handle case of user joining a private domain
+	if !domain.Public {
+		err := errors.New("User is joining a private domain which is not implemented yet.")
+		NewError(w, http.StatusNotImplemented, "Private domain error", err, "DomainJoinHandler")
+		return
+	}
+
+	// Update pupal user in datastore & memcache. No transaction needed.
+	pu.Domains = append(pu.Domains, dKey)
 	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to put newly updated domain of user into ~pupal: ", err)
+		NewError(w, 500, "Failed to update the domains of pupal user", err, "DomainJoinHandler")
+		return
+	}
+	if err := SetCache(c, uid, pu); err != nil {
+		NewError(w, 500, "Failed to update cache of pupal user", err, "DomainJoinHandler")
 		return
 	}
 
 	// Create the user
-	var u User
-	u.Name, u.Email, u.Photo = pu.Name, pu.Email, pu.Photo
-
-	// Add user as descendent of domain
-	if _, err := datastore.Put(c, datastore.NewKey(c, "User", uid, 0, domain.Key), &u); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to add user as descendent of domain:", err)
+	u := User{
+		Name:    pu.Name,
+		Email:   pu.Email,
+		Photo:   pu.Photo,
+		PupalId: pu.Key.Encode(),
 	}
 
-}
-
-func DomainSubsHandler(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	id := mux.Vars(r)["id"]
-	uid := context.Get(r, "UID").(string)
-
-	// Get domain
-	var domain Domain
-	dKey, err := datastore.DecodeKey(id)
-	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to decode the domain id in the url: ", err)
-		return
-	}
-	domain.Key = dKey
-	if err := datastore.Get(c, domain.Key, &domain); err != nil {
-		w.WriteHeader(500)
-		log.Printf("Failed to get domain from datastore: %v\n", err)
-		return
-	}
-
-	// Get user from pupal
-	var pu PupalUser
-	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-	if err = datastore.Get(c, pu.Key, &pu); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to get the user: ", err)
-		return
-	}
-
-	// Put updated user into ~pupal
-	pu.Subscriptions = append(pu.Subscriptions, domain.Key)
-	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to update user's subscription: ", err)
-		return
-	}
-
-	// Put updated domain into datastore
-	domain.Subscribers = append(domain.Subscribers, pu.Key)
-	if _, err := datastore.Put(c, domain.Key, &domain); err != nil {
-		w.WriteHeader(500)
-		log.Println("Failed to put newly added subscriber into domain: ", err)
+	// Add user as descendent of domain with stringID as uid
+	if _, err := datastore.Put(c, datastore.NewKey(c, "User", uid, 0, dKey), &u); err != nil {
+		NewError(w, 500, "Failed to add user as a child of domain", err, "DomainJoinHandler")
 		return
 	}
 }

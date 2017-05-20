@@ -56,10 +56,6 @@ body {
 /* begin navbar */
 .navbar-brand {
 	font-weight: bold;
-	align-items: center;
-}
-#header-nav {
-	margin-bottom: 30px;
 }
 #header-nav .dropdown-menu {
 	width: 300px;
@@ -75,7 +71,6 @@ body {
 /* end navbar */
 
 /* begin home */
-
 /* end home */
 
 /* begin domain */
@@ -92,32 +87,27 @@ body {
 .projects-content .proj-entry-content {
 	position: relative;
 }
-
 .projects-content .card-title {
 	margin-left: 40px;
 	margin-top: 20px;
 	font-weight: bold;
 	display: inline-block;
 }
-
 .projects-content .card-text {
 	margin-left:40px;
 	margin-bottom: 20px;
 }
-
 .projects-content .num-subscribes-text {
 	position: absolute;
 	top: 20px;
 	right: 40px;
 }
-
 .projects-content .desc-text {
 	width: 500px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-
 .projects-content .proj-entry-tag {
 	display: inline-block;
 }
@@ -127,20 +117,26 @@ body {
 #proj-modal .modal-header {
 	font-weight: bold;
 }
-
+#proj-modal .modal-header .btn-circle.btn-lg {
+	position: absolute;
+	top: 150px;
+	right: 50px;
+	width: 50px;
+	height: 50px;
+	padding: 10px 10px;
+	font-size: 18px;
+	border-radius: 25px;
+}
 #proj-modal .modal-body {
 	margin-right: 100px;
 	margin-left: 100px;
 }
-
 #proj-modal .modal-footer {
 	text-align: center;
 }
-
 #proj-modal .modal-title {
 	margin: 50px 50px;
 }
-
 #proj-modal .proj-author-image {
 	display: inline-block;
 	border-radius: 50%;
@@ -148,8 +144,26 @@ body {
 	width: 50px;
 	height: 50px;
 }
-
 #proj-modal .author-info-contact {
 	display: inline-block;
 }
 /* end projmodal */
+
+.host-content {
+	margin-bottom: 100px;
+}
+
+/* begin user page */
+#user-profile-pic {
+	margin-right: 50px;
+	border-radius: 50%;
+	height: 100px;
+	width: 100px;
+	position: relative;
+	display: inline-block;
+}
+#user-profile-name {
+	display: inline-block;
+}
+/* end user page */
+

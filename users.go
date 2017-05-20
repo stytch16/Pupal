@@ -3,37 +3,41 @@ package app
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 )
 
+// UserRegisterPupalHandler registers the user into the ~pupal domain.
+// Dependent of user
 func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+
+	// Get the uid to use as stringId for new pupal user's key
 	uid := context.Get(r, "UID").(string)
 
+	// Read POST body
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Failed to decode json into user, %v\n", err)
+		NewError(w, 500, "Failed to decode the json in POST body", err, "UserRegisterPupalHandler")
 		return
 	}
 
-	var u PupalUser
-	json.Unmarshal(body, &u)
-	u.Domains = make([]*datastore.Key, 0)
-	u.Subscriptions = make([]*datastore.Key, 0)
-	u.Skills = make([]string, 0)
-	u.Projects = make([]*datastore.Key, 0)
+	// Create the pupal user
+	var pu PupalUser
+	json.Unmarshal(body, &pu)
 
-	key := datastore.NewKey(c, "PupalUser", uid, 0,
-		datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-	if _, err := datastore.Put(c, key, &u); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Failed to put user into domain, %v\n", err)
+	// Put pupal user into datastore and memcache
+	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
+	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
+		NewError(w, 500, "Failed to put pupal user into datastore", err, "UserRegisterPupalHandler")
+		return
+	}
+	if err := SetCache(c, uid, pu); err != nil {
+		NewError(w, 500, "Failed to put pupal user into cache", err, "UserRegisterPupalHandler")
 		return
 	}
 }
@@ -48,8 +52,62 @@ func UserDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("UserDeleteHandler"))
 }
 
+// UserGetHandler returns json info of the user given id in url
+// Dependent on pupal user in order to display Erdos number
 func UserGetHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("UserGetHandler"))
+	c := appengine.NewContext(r)
+	id := mux.Vars(r)["id"]
+
+	// Get the pupal user with id in url
+	puKey, err := datastore.DecodeKey(id)
+	if err != nil {
+		NewError(w, 500, "Failed to decode user id in url", err, "UserGetHandler")
+		return
+	}
+	var pu PupalUser
+	if err := datastore.Get(c, puKey, &pu); err != nil {
+		NewError(w, 500, "Failed to get the pupal user", err, "UserGetHandler")
+		return
+	}
+
+	// Get projects
+	projects := make([]Project, len(pu.Projects))
+	if err := datastore.GetMulti(c, pu.Projects, projects); err != nil {
+		NewError(w, 500, "Failed to get projects of pupal user", err, "UserGetHandler")
+		return
+	}
+
+	// Get domains
+	domains := make([]Domain, len(pu.Domains))
+	if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
+		NewError(w, 500, "Failed to get domains of pupal user", err, "UserGetHandler")
+		return
+	}
+
+	// Configure JSON response
+	w.Header().Set("Content-Type", "application/json")
+	d := struct {
+		Name     string    `json:"name"`
+		Email    string    `json:"email"`
+		Photo    string    `json:"photo"`
+		Summary  string    `json:"summary"`
+		Skills   []string  `json:"skills"`
+		Projects []Project `json:"projects"`
+		Domains  []Domain  `json:"domains"`
+	}{
+		Name:     pu.Name,
+		Email:    pu.Email,
+		Photo:    pu.Photo,
+		Summary:  pu.Summary,
+		Skills:   pu.Skills,
+		Projects: projects,
+		Domains:  domains,
+	}
+	// Encode response into JSON
+	if err := json.NewEncoder(w).Encode(&d); err != nil {
+		NewError(w, 500, "Failed to encode the json response", err, "UserGetHandler")
+		return
+	}
 }
 
 func UserMsgHandler(w http.ResponseWriter, r *http.Request) {
