@@ -20,16 +20,38 @@ type PupalUser struct {
 	Collaborators []*datastore.Key `json:"collaborators"` // keys of PupalUser collaborators
 }
 
+func NewPupalUser() *PupalUser {
+	return &PupalUser{
+		Key:           nil,
+		Name:          "",
+		Email:         "",
+		Photo:         "",
+		Summary:       "",
+		Skills:        nil,
+		Domains:       nil,
+		Subscriptions: nil,
+		Projects:      nil,
+		Collaborators: nil,
+	}
+}
+
 type User struct {
-	Id      string `json:"id" datastore:"-"`
 	Name    string `json:"name"`
 	Email   string `json:"email"`
 	Photo   string `json:"photo"`
 	PupalId string `json:"pupal_id"`
 }
 
+func NewUser() *User {
+	return &User{
+		Name:    "",
+		Email:   "",
+		Photo:   "",
+		PupalId: "",
+	}
+}
+
 type Project struct {
-	Id            string           `json:"id" datastore:"-"`
 	Author        *datastore.Key   `json:"author"`
 	Collaborators []*datastore.Key `json:"collaborators"` // Requires author permissions
 	Title         string           `json:"title"`         // Requires collaborator permissions
@@ -43,13 +65,38 @@ type Project struct {
 	Subscribers   []*datastore.Key `json:"subscribers"`
 }
 
+func NewProject() *Project {
+	return &Project{
+		Author:        nil,
+		Collaborators: nil,
+		Title:         "",
+		Tags:          nil,
+		Description:   "",
+		TeamSize:      "",
+		Website:       "",
+		CreatedAt:     time.Now(),
+		Updates:       nil,
+		Comments:      nil,
+		Subscribers:   nil,
+	}
+}
+
 type Domain struct {
-	Id          string           `json:"id" datastore:"-"`
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	PhotoURL    string           `json:"photo_url"`
 	Subscribers []*datastore.Key `json:"subscribers"`
 	Public      bool             `json:"public"`
+}
+
+func NewDomain() *Domain {
+	return &Domain{
+		Name:        "",
+		Description: "",
+		PhotoURL:    "",
+		Subscribers: nil,
+		Public:      true,
+	}
 }
 
 type Update struct {

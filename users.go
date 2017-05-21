@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	ctx "golang.org/x/net/context"
+
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"google.golang.org/appengine"
@@ -27,12 +29,12 @@ func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the pupal user
-	var pu PupalUser
-	json.Unmarshal(body, &pu)
+	pu := NewPupalUser()
+	json.Unmarshal(body, pu)
 
 	// Put pupal user into datastore and memcache
 	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
+	if _, err := datastore.Put(c, pu.Key, pu); err != nil {
 		NewError(w, 500, "Failed to put pupal user into datastore", err, "UserRegisterPupalHandler")
 		return
 	}
@@ -64,24 +66,36 @@ func UserGetHandler(w http.ResponseWriter, r *http.Request) {
 		NewError(w, 500, "Failed to decode user id in url", err, "UserGetHandler")
 		return
 	}
-	var pu PupalUser
-	if err := datastore.Get(c, puKey, &pu); err != nil {
-		NewError(w, 500, "Failed to get the pupal user", err, "UserGetHandler")
-		return
-	}
 
-	// Get projects
-	projects := make([]Project, len(pu.Projects))
-	if err := datastore.GetMulti(c, pu.Projects, projects); err != nil {
-		NewError(w, 500, "Failed to get projects of pupal user", err, "UserGetHandler")
-		return
-	}
+	pu := NewPupalUser()
 
-	// Get domains
-	domains := make([]Domain, len(pu.Domains))
-	if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
-		NewError(w, 500, "Failed to get domains of pupal user", err, "UserGetHandler")
+	var (
+		projects []Project
+		domains  []Domain
+	)
+	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
+		// Get pupal user
+		if err := datastore.Get(c, puKey, pu); err != nil {
+			return err
+		}
+
+		// Get projects
+		projects := make([]Project, len(pu.Projects))
+		if err := datastore.GetMulti(c, pu.Projects, projects); err != nil {
+			return err
+		}
+
+		// Get domains
+		domains := make([]Domain, len(pu.Domains))
+		if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
+			return err
+		}
+		return nil
+	}, &datastore.TransactionOptions{XG: true})
+	if err != nil {
+		NewError(w, 500, "Failed to complete transaction", err, "UserGetHandler")
 		return
+
 	}
 
 	// Configure JSON response

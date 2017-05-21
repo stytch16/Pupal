@@ -1,0 +1,40 @@
+{
+	"projects":[
+		{
+		"author": "MichaelFaraday@gmail.com",
+		"collaborators": [{"email":"JamesClerkMaxwell@gmail.com"}, {"email":"AlbertEinstein@gmail.com"}],
+		"title": "The Electromagnetism Project",
+		"tags": [{"name":"electromagnetism"}, {"name":"induction"}],
+		"description": "Faraday's experiment showing induction between coils of wire: The liquid battery (right) provides a current that flows through the small coil (A), creating a magnetic field. When the coils are stationary, no current is induced. But when the small coil is moved in or out of the large coil (B), the magnetic flux through the large coil changes, inducing a current which is detected by the galvanometer (G).",
+		"teamsize": "3-5",
+		"website": "https://en.wikipedia.org/wiki/Electromagnetic_induction"
+		},
+		{
+		"author": "ErwinSchrödinger@gmail.com",
+		"collaborators": [{"email":"PaulDirac@gmail.com"}, {"email":"WernerHeisenberg@gmail.com"}, {"email":"NielsBohr@gmail.com"}, {"email":"RichardFeynman@gmail.com"}],
+		"title":"The Quantum Physics Project",
+		"tags": [{"name":"quantization"}, {"name":"wave-particle-duality"}, {"name":"uncertainty-principle"}],
+		"description":"Quantum mechanics (QM; also known as quantum physics or quantum theory), including quantum field theory, is a branch of physics which is the fundamental theory of nature at small scales and low energy levels of atoms and subatomic particles.[1] Classical physics, the physics existing before quantum mechanics, derives from quantum mechanics as an approximation valid only at large (macroscopic) scales. Quantum mechanics differs from classical physics in that energy, momentum and other quantities are often restricted to discrete values (quantization), objects have characteristics of both particles and waves (wave-particle duality), and there are limits to the precision with which quantities can be known (Uncertainty principle).",
+		"teamsize": "10+",
+		"website": "https://en.wikipedia.org/wiki/Quantum_mechanics"
+		},
+		{
+		"author": "ErnestRutherford@gmail.com",
+		"collaborators": [{"email":"NielsBohr@gmail.com"}, {"email":"WernerHeisenberg@gmail.com"}, {"email":"AlbertEinstein@gmail.com"}],
+		"title": "The Nuclear Physics Project", 
+		"tags": [{"name":"radioactivity"}, {"name":"fusion"}, {"name":"fission"}],
+		"description":"Nuclear physics is the field of physics that studies atomic nuclei and their constituents and interactions. Other forms of nuclear matter are also studied.[1] Nuclear physics should not be confused with atomic physics, which studies the atom as a whole, including its electrons. Discoveries in nuclear physics have led to applications in many fields. This includes nuclear power, nuclear weapons, nuclear medicine and magnetic resonance imaging, industrial and agricultural isotopes, ion implantation in materials engineering, and radiocarbon dating in geology and archaeology. Such applications are studied in the field of nuclear engineering.",
+		"teamsize": "10+",
+		"website": "https://en.wikipedia.org/wiki/Nuclear_physics"
+		},
+		{
+		"author": "GalileoGalilei@gmail.com",
+		"collaborators": [{"email":"IsaacNewton@gmail.com"}, {"email":"RichardFeynman@gmail.com"}, {"email":"AlbertEinstein@gmail.com"}],
+		"title": "The Science is Awesome Project", 
+		"tags": [{"name":"science"}, {"name":"intelligence"}, {"name":"math"}, {"name":"magic"}],
+		"description":"Get a life, Neil deGrasse Tyson and Bill Nye. What have they even done?",
+		"teamsize": "5-10",
+		"website": "https://en.wikipedia.org/wiki/Science"
+		}
+	]
+}

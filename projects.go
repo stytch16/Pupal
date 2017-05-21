@@ -2,11 +2,13 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
+
+	ctx "golang.org/x/net/context"
 
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
@@ -22,84 +24,92 @@ func ProjectGetHandler(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 
 	// Data regarding user's association to project
 	isAuthor, isCollaborator, isSubscriber := false, false, false
 
 	// Get project with id in url
-	var proj Project
+	proj := NewProject()
+	author := NewUser()
+
 	projKey, err := datastore.DecodeKey(id)
 	if err != nil {
 		NewError(w, 500, "Failed to decode the project id from request URL", err, "ProjectGetHandler")
 		return
 	}
-	if err := datastore.Get(c, projKey, &proj); err != nil {
-		NewError(w, 500, "Failed to get the project from datastore", err, "ProjectGetHandler")
-		return
-	}
 
-	// Get the user who is author of project
-	var author User
-	if err := datastore.Get(c, proj.Author, &author); err != nil {
-		NewError(w, 500, "Failed to get the author from datastore", err, "ProjectGetHandler")
-		return
-	}
-
-	// Is pupal user the author?
-	if pu.Key.Encode() == author.PupalId {
-		isAuthor = true
-		isCollaborator = true
-		isSubscriber = true
-	}
-
-	// Get the collaborators
-	collaborators := make([]User, len(proj.Collaborators))
-	if err := datastore.GetMulti(c, proj.Collaborators, collaborators); err != nil {
-		NewError(w, 500, "Failed to get the subscribers of project", err, "ProjectGetHandler")
-		return
-	}
-
-	// Is the pupal user a collaborator? If pupal user is author, then forget check.
-	if !isAuthor {
-		for _, proj := range pu.Projects {
-			if proj.Equal(projKey) {
-				isCollaborator = true
-				isSubscriber = true
-			}
-			break
+	var collaborators, subscribers []PupalUser
+	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
+		// Get project
+		if err := datastore.Get(c, projKey, proj); err != nil {
+			return err
 		}
-	}
 
-	// Get the subscribers
-	subscribers := make([]PupalUser, len(proj.Subscribers))
-	if err := datastore.GetMulti(c, proj.Subscribers, subscribers); err != nil {
-		NewError(w, 500, "Failed to get the subscribers of project", err, "ProjectGetHandler")
-		return
-	}
-
-	// Is the pupal user a subscriber? If pupal user is author and is collaborator, forget check.
-	if !isAuthor && !isCollaborator {
-		for _, subscription := range pu.Subscriptions {
-			if subscription.Equal(projKey) {
-				isSubscriber = true
-			}
-			break
+		// Get the user who is author of project
+		if err := datastore.Get(c, proj.Author, author); err != nil {
+			return err
 		}
+
+		// Is pupal user the author?
+		if pu.Key.Encode() == author.PupalId {
+			isAuthor = true
+			isCollaborator = true
+			isSubscriber = true
+		}
+
+		// Get the collaborators
+		collaborators := make([]PupalUser, len(proj.Collaborators))
+		if err := datastore.GetMulti(c, proj.Collaborators, collaborators); err != nil {
+			return errors.New("Failed to get collaborators: " + err.Error())
+		}
+
+		// Is the pupal user a collaborator? If pupal user is author, then forget check.
+		if !isAuthor {
+			for _, proj := range pu.Projects {
+				if proj.Equal(projKey) {
+					isCollaborator = true
+					isSubscriber = true
+				}
+				break
+			}
+		}
+
+		// Get the subscribers
+		subscribers := make([]PupalUser, len(proj.Subscribers))
+		if err := datastore.GetMulti(c, proj.Subscribers, subscribers); err != nil {
+			return errors.New("Failed to get subscribers: " + err.Error())
+		}
+
+		// Is the pupal user a subscriber? If pupal user is author and is collaborator, forget check.
+		if !isAuthor && !isCollaborator {
+			for _, subscription := range pu.Subscriptions {
+				if subscription.Equal(projKey) {
+					isSubscriber = true
+				}
+				break
+			}
+		}
+		return nil
+	}, &datastore.TransactionOptions{XG: true})
+	if err != nil {
+		NewError(w, 500, "Failed to complete the transaction", err, "ProjectGetHandler")
+		return
+
 	}
 
 	// Return JSON of data of project
 	w.Header().Set("Content-Type", "application/json")
 	d := struct {
-		Id            string   `json:"id"`
-		Author        User     `json:"author"`
-		Collaborators []User   `json:"collaborators"`
-		Title         string   `json:"title"`
-		Description   string   `json:"description"`
-		TeamSize      string   `json:"team_size"`
-		Website       string   `json:"website"`
-		CreatedAt     string   `json:"created_at"`
-		Updates       []Update `json:"updates"`
+		Id            string      `json:"id"`
+		Author        User        `json:"author"`
+		Collaborators []PupalUser `json:"collaborators"`
+		Title         string      `json:"title"`
+		Description   string      `json:"description"`
+		TeamSize      string      `json:"team_size"`
+		Website       string      `json:"website"`
+		CreatedAt     string      `json:"created_at"`
+		Updates       []Update    `json:"updates"`
 		// Comments    []Comment   `json:"comments"`
 		Subscribers    []PupalUser `json:"subscribers"`
 		IsAuthor       bool        `json:"is_author"`
@@ -107,7 +117,7 @@ func ProjectGetHandler(w http.ResponseWriter, r *http.Request) {
 		IsSubscriber   bool        `json:"is_subscriber"`
 	}{
 		Id:            id,
-		Author:        author,
+		Author:        *author,
 		Collaborators: collaborators,
 		Title:         proj.Title,
 		Description:   proj.Description,
@@ -132,14 +142,13 @@ func ProjectCommentHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ProjectSubsHandler handles case when user subscribes to a project.
-// Dependant on pupal user. This must never be called if user has already subscribed.
-// Also updates pupal user.
+// Dependant on pupal user. Also updates pupal user and project. Requires transaction.
 func ProjectSubsHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	id := mux.Vars(r)["id"]
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 	// and uid
 	uid := context.Get(r, "UID").(string)
 
@@ -150,30 +159,41 @@ func ProjectSubsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assume user is subscribing to project for first time. Append the project key.
-	pu.Subscriptions = append(pu.Subscriptions, projKey)
+	// Add the project key to pupal user's subscriptions
+	puSubscriptionSet := NewKeySet(pu.Subscriptions)
+	puSubscriptionSet.Add(projKey)
+	pu.Subscriptions = puSubscriptionSet.GetSlice()
 
-	// Update the pupal user in datastore and memcache. No transaction needed.
-	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
-		NewError(w, 500, "Failed to update the subscriptions of pupal user", err, "ProjectSubsHandler")
-		return
-	}
-	if err := SetCache(c, uid, pu); err != nil {
-		NewError(w, 500, "Failed to update pupal user in memcache", err, "ProjectSubsHandler")
-		return
-	}
+	proj := NewProject()
 
-	// Get the project and append key of PupalUser to subscribers
-	var proj Project
-	if err := datastore.Get(c, projKey, &proj); err != nil {
-		NewError(w, 500, "Failed to get project from datastore", err, "ProjectSubsHandler")
-		return
-	}
-	proj.Subscribers = append(proj.Subscribers, pu.Key)
+	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
 
-	// Update the project in datastore
-	if _, err := datastore.Put(c, projKey, &proj); err != nil {
-		NewError(w, 500, "Failed to update project's subscribers", err, "ProjectSubsHandler")
+		// Update the pupal user in datastore and memcache. No transaction needed.
+		if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+			return err
+		}
+		if err := SetCache(c, uid, pu); err != nil {
+			return err
+		}
+
+		// Get the project and append key of PupalUser to subscribers
+		if err := datastore.Get(c, projKey, proj); err != nil {
+			return err
+		}
+		projSubscribeKeyList := NewKeySet(proj.Subscribers)
+		projSubscribeKeyList.Add(pu.Key)
+		proj.Subscribers = projSubscribeKeyList.GetSlice()
+
+		// Update the project in datastore
+		if _, err := datastore.Put(c, projKey, proj); err != nil {
+			return err
+		}
+		return nil
+	}, &datastore.TransactionOptions{XG: true})
+	if err != nil {
+		NewError(w, 500, "Failed to complete transaction for subscribing to project", err, "ProjectSubsHandler")
+		return
+
 	}
 }
 
@@ -185,7 +205,7 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["domain"]
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 	// and uid
 	uid := context.Get(r, "UID").(string)
 
@@ -197,45 +217,52 @@ func ProjectHostPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read json of POST data into a project struct
-	var proj Project
+	proj := NewProject()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		NewError(w, 500, "Failed to decode json body", err, "ProjectHostPostHandler")
 		return
 	}
-	json.Unmarshal(body, &proj)
+	json.Unmarshal(body, proj)
 
 	// Add the new project as descendant to Domain with random generated key.
 	projIncompleteKey := datastore.NewIncompleteKey(c, "Project", dKey)
+	var projKey *datastore.Key
 
 	// Extract hashtags from description (max 5)
-	proj.Tags = make([]string, 0)
+	projTagSet := NewSet(proj.Tags)
 	for _, tag := range regexp.MustCompile("#[_a-zA-Z0-9/-]+").FindAllString(proj.Description, 5) {
-		proj.Tags = append(proj.Tags, strings.ToLower(strings.TrimPrefix(tag, "#")))
+		projTagSet.Add(strings.ToLower(strings.TrimPrefix(tag, "#")))
 	}
+	proj.Tags = projTagSet.GetSlice()
 
-	// Set domain-specific user as author and put a timestamp for creation date
+	// Set domain-specific user as author
 	userKey := datastore.NewKey(c, "User", uid, 0, dKey)
-	proj.Author, proj.CreatedAt = userKey, time.Now()
+	proj.Author = userKey
 
-	// Add the new project
-	projKey, err := datastore.Put(c, projIncompleteKey, &proj)
+	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
+		// Add the new project
+		projKey, err := datastore.Put(c, projIncompleteKey, proj)
+		if err != nil {
+			return err
+		}
+
+		// Add the new project into pupal user's projects. Since this is new, it shouldn't exist in pupal user's projects field
+		pu.Projects = append(pu.Projects, projKey)
+
+		// Update pupal user in datastore and memcache
+		if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+			return err
+		}
+		if err := SetCache(c, uid, pu); err != nil {
+			return err
+		}
+		return nil
+	}, &datastore.TransactionOptions{XG: true})
 	if err != nil {
-		NewError(w, 500, "Failed to put the new project", err, "ProjectHostPostHandler")
+		NewError(w, 500, "Failed to complete transaction to store new project", err, "ProjectHostPostHandler")
 		return
-	}
 
-	// Add the new project into pupal user's projects
-	pu.Projects = append(pu.Projects, projKey)
-
-	// Update pupal user in datastore and memcache
-	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
-		NewError(w, 500, "Failed to update pupal user's projects", err, "ProjectHostPostHandler")
-		return
-	}
-	if err := SetCache(c, uid, &pu); err != nil {
-		NewError(w, 500, "Failed to update pupal user in cache", err, "ProjectHostPostHandler")
-		return
 	}
 
 	// Return id of project for user to view.

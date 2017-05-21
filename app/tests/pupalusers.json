@@ -1,0 +1,81 @@
+{
+	"pupal_users": [
+		{
+		"name": "Albert Einstein",
+		"email": "AlbertEinstein@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg",
+		"summary": "Albert Einstein was a German-born theoretical physicist. He developed the theory of relativity, one of the two pillars of modern physics. Einstein's work is also known for its influence on the philosophy of science.",
+		"domains": [{"name": "University of California, Berkeley"}]
+		},
+		{
+		"name": "Isaac Newton",
+		"email": "IsaacNewton@gmail.com",
+		"photo": "https://www.universetoday.com/wp-content/uploads/2009/09/sir_isaac.jpg",
+		"summary": "Sir Isaac Newton PRS was an English mathematician, astronomer, and physicist who is widely recognised as one of the most influential scientists of all time and a key figure in the scientific revolution.",
+		"domains": [{"name": "University of California, Davis"}]
+		},
+		{
+		"name": "Richard Feynman",
+		"email": "RichardFeynman@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg",
+		"summary": "Richard Phillips Feynman was an American theoretical physicist known for his work in the path integral formulation of quantum mechanics, the theory of quantum electrodynamics, and the physics of the ...",
+		"domains": [{"name": "University of California, Irvine"}]
+		},
+		{
+		"name": "James Clerk Maxwell",
+		"email": "JamesClerkMaxwell@gmail.com",
+		"photo": "http://www.biographyonline.net/wp-content/uploads/2014/05/James_clerk_maxwell4.jpg",
+		"summary": "James Clerk Maxwell FRS FRSE was a Scottish scientist in the field of mathematical physics. His most notable achievement was to formulate the classical theory of electromagnetic radiation, bringing ...",
+		"domains": [{"name": "University of California, Merced"}]
+		},
+		{
+		"name": "Galileo Galilei",
+		"email": "GalileoGalilei@gmail.com",
+		"photo": "https://www.biography.com/.image/t_share/MTE5NDg0MDU0OTczNDE2OTc1/galileo-9305220-1-402.jpg",
+		"summary": "Galileo Galilei was an Italian polymath: astronomer, physicist, engineer, philosopher, and mathematician. He played a major role in the scientific revolution of the seventeenth century.",
+		"domains": [{"name": "University of California, Riverside"}]
+		},
+		{
+		"name": "Niels Bohr",
+		"email": "NielsBohr@gmail.com",
+		"photo": "https://www.nobelprize.org/nobel_prizes/physics/laureates/1922/bohr.jpg",
+		"summary": "Niels Henrik David Bohr was a Danish physicist who made foundational contributions to understanding atomic structure and quantum theory, for which he received the Nobel Prize in Physics in 1922.",
+		"domains": [{"name": "University of California, San Diego"}]
+		},
+		{
+		"name": "Ernest Rutherford",
+		"email": "ErnestRutherford@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Ernest_Rutherford_LOC.jpg/220px-Ernest_Rutherford_LOC.jpg",
+		"summary": "Ernest Rutherford, 1st Baron Rutherford of Nelson, OM, FRS was a New Zealand-born British physicist who came to be known as the father of nuclear physics.",
+		"domains": [{"name": "University of California, Santa Barbara"}]
+		},
+		{
+		"name": "Werner Heisenberg",
+		"email": "WernerHeisenberg@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Bundesarchiv_Bild183-R57262%2C_Werner_Heisenberg.jpg/220px-Bundesarchiv_Bild183-R57262%2C_Werner_Heisenberg.jpg",
+		"summary": "Werner Karl Heisenberg was a German theoretical physicist and one of the key pioneers of quantum mechanics. He published his work in 1925 in a breakthrough paper.",
+		"domains": [{"name": "University of California, Santa Cruz"}]
+		},
+		{
+		"name": "Paul Dirac",
+		"email": "PaulDirac@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Bundesarchiv_Bild183-R57262%2C_Werner_Heisenberg.jpg/220px-Bundesarchiv_Bild183-R57262%2C_Werner_Heisenberg.jpg",
+		"summary": "Paul Adrien Maurice Dirac OM FRS was an English theoretical physicist who made fundamental contributions to the early development of both quantum mechanics and quantum electrodynamics.",
+		"domains": [{"name": "University of California, Irvine"}]
+		},
+		{
+		"name": "Erwin Schrödinger",
+		"email": "ErwinSchrödinger@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Erwin_Schr%C3%B6dinger_%281933%29.jpg/220px-Erwin_Schr%C3%B6dinger_%281933%29.jpg",
+		"summary": "Erwin Rudolf Josef Alexander Schrödinger, sometimes written as Erwin Schrodinger or Erwin Schroedinger, was a Nobel Prize-winning Austrian physicist who developed a number of fundamental results in the ...",
+		"domains": [{"name": "University of California, Irvine"}]
+		},
+		{
+		"name": "Michael Faraday",
+		"email": "MichaelFaraday@gmail.com",
+		"photo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Faraday-Millikan-Gale-1913.jpg/190px-Faraday-Millikan-Gale-1913.jpg",
+		"summary": "Michael Faraday FRS was an English scientist who contributed to the study of electromagnetism and electrochemistry. His main discoveries include the principles underlying electromagnetic induction, diamagnetism and electrolysis.",
+		"domains": [{"name": "University of California, Irvine"}]
+		}
+	]
+}

@@ -87,8 +87,7 @@ class Login extends React.Component{
 				<div className="modal-dialog">
 					<div className="loginmodal-content text-center">
 						<div className="modal-header">
-							<img id="pupal-login-image" src="/static/images/favicon-32x32.png" alt="Pupal Login"></img>
-							<h3>Pupal</h3>
+							<h1>Pupal</h1>
 						</div>
 						<div className="modal-body">
 							<div className="btn-group">
@@ -515,7 +514,8 @@ class Projects extends React.Component {
 		super(props);
 		this.state = {
 			projects: [],
-			proj: null
+			proj: null,
+			subClick: false
 		};
 	}
 	componentDidMount() {
@@ -552,17 +552,33 @@ class Projects extends React.Component {
 		}
 	}
 	handleProjSubClick(id) {
-		const resetProj = () => { this.getProject(this.props.id) }
-		firebase.auth().currentUser.getToken(true).then(function(token) {
-			$.ajax({
-				url: "/projects/"+id+"/subscribe",
-				type: "GET",
-				beforeSend: function(xhr){
-					xhr.setRequestHeader('Authorization', token);
-				},
-				success: () => resetProj()
+		const toggleSubClick = () => { 
+			this.setState({subClick: !this.state.subClick}) 
+		}
+		if (!this.state.proj.is_subscriber) {
+			firebase.auth().currentUser.getToken(true).then(function(token) {
+				$.ajax({
+					url: "/projects/"+id+"/subscribe",
+					type: "GET",
+					beforeSend: function(xhr){
+						xhr.setRequestHeader('Authorization', token);
+					},
+					success: () => toggleSubClick()
+				});
 			});
-		});
+		} else {
+			firebase.auth().currentUser.getToken(true).then(function(token) {
+				$.ajax({
+					url: "/projects/"+id+"/unsubscribe",
+					type: "GET",
+					beforeSend: function(xhr){
+						xhr.setRequestHeader('Authorization', token);
+					},
+					success: () => toggleSubClick()
+				});
+			});
+
+		}
 	}
 	handleUserClick(id) {
 		// Redirect to the user page
@@ -572,6 +588,7 @@ class Projects extends React.Component {
 		return (
 			<div className="projects-content">
 				<ProjModal proj={this.state.proj} 
+					subClick={this.state.subClick}
 					onProjSubClick={()=>this.handleProjSubClick(this.state.proj.id)}
 					onUserClick={(id)=>this.handleUserClick(id)}/>
 				<div className="project-group" key="projects-listing">
@@ -619,11 +636,23 @@ function ProjModal(props) {
 							<button type="button" className="close" data-dismiss="modal">&times;
 							</button>
 							<h1 className="modal-title">{props.proj.title}</h1>
-							<button type="button" 
-								className="btn btn-default btn-circle btn-lg"
-								onClick={()=>this.props.onProjSubClick()}>
-							<i className="fa fa-star-o" aria-hidden="true"></i>
-							</button>
+							{
+							!props.proj.is_collaborator && 
+								<button type="button" className="btn btn-default btn-circle btn-lg"
+									onClick={()=>props.onProjSubClick()}>
+									{
+									(!props.proj.is_subscriber && !props.subClick) ? 
+										<i className="fa fa-star-o" aria-hidden="true"></i> 
+										: <i className="fa fa-star" aria-hidden="true"></i> 
+									}
+								</button>
+							}
+							{
+							props.proj.is_collaborator && 
+								<button type="button" className="btn btn-primary btn-circle btn-lg">
+									<i className="fa fa-pencil-square-o" aria-hidden="true"></i>
+								</button>
+							}
 						</div>
 						<div className="modal-body">
 							<div className="desc-header-info">

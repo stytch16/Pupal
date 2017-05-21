@@ -18,7 +18,6 @@ import (
 )
 
 func init() {
-
 	// Initialize Firebase SDK
 	firebase.InitializeApp(&firebase.Options{
 		ServiceAccountPath: "app/firebase/serviceAccountCredentials.json",
@@ -88,7 +87,11 @@ func init() {
 	// Admin routes
 	adminRouter := mux.NewRouter().PathPrefix("/admin").Subrouter()
 	adminRouter.HandleFunc("/domain/add", AdminAddDomainHandler).Methods("POST")
+	adminRouter.HandleFunc("/users/add", AdminAddPupalUserHandler).Methods("POST")
+	adminRouter.HandleFunc("/projects/add", AdminAddProjectHandler).Methods("POST")
 	adminRouter.HandleFunc("/pupalusers", AdminGetUsersHandler).Methods("GET")
+
+	// Admin routes middleware
 	r.PathPrefix("/admin").Handler(admin.With(negroni.Wrap(adminRouter)))
 
 	http.Handle("/", r)
@@ -120,14 +123,14 @@ func GetUserFromCache(w http.ResponseWriter, r *http.Request, next http.HandlerF
 	c := appengine.NewContext(r)
 	uid := gorCtx.Get(r, "UID").(string)
 
-	var pu PupalUser
-	if _, err := memcache.Gob.Get(c, uid, &pu); err == memcache.ErrCacheMiss {
+	pu := NewPupalUser()
+	if _, err := memcache.Gob.Get(c, uid, pu); err == memcache.ErrCacheMiss {
 		// Grab from datastore
 		pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-		if err := datastore.Get(c, pu.Key, &pu); err == datastore.ErrNoSuchEntity {
+		if err := datastore.Get(c, pu.Key, pu); err == datastore.ErrNoSuchEntity {
 			// User is entirely new and must be added to datastore by a POST /user/registerPupalUser request
 			// For now we initialize pupal user with empty fields inside datastore.
-			if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
+			if _, err := datastore.Put(c, pu.Key, pu); err != nil {
 				NewError(w, 500, "Failed to put new user inside the datastore", err, "GetUserFromCache")
 				return
 			}

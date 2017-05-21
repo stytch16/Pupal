@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	ctx "golang.org/x/net/context"
+
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 
@@ -48,7 +50,7 @@ func DomainUserListHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 
 	// Write nil if pupal user has no domains yet and return
 	if len(pu.Domains) == 0 {
@@ -56,7 +58,7 @@ func DomainUserListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get domains of pupal user
+	// Get pupal user's domain
 	domains := make([]Domain, len(pu.Domains))
 	if err := datastore.GetMulti(c, pu.Domains, domains); err != nil {
 		NewError(w, 500, "Failed to get the domains of pupal user", err, "DomainUserListHandler")
@@ -86,13 +88,13 @@ func DomainGetHandler(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
 	// Get domain from id in url
-	var domain Domain
+	domain := NewDomain()
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
 		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainGetHandler")
 		return
 	}
-	if err := datastore.Get(c, dKey, &domain); err != nil {
+	if err := datastore.Get(c, dKey, domain); err != nil {
 		NewError(w, 500, "Failed to get domain from datastore", err, "DomainGetHandler")
 		return
 	}
@@ -120,7 +122,7 @@ func DomainGetMemberHandler(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 	// Decode domain key
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
@@ -128,11 +130,9 @@ func DomainGetMemberHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, puDom := range pu.Domains {
-		if puDom.Equal(dKey) {
-			w.Write([]byte("true"))
-			return
-		}
+	if NewKeySet(pu.Domains).Exist(dKey) {
+		w.Write([]byte("true"))
+		return
 	}
 	w.Write([]byte("false"))
 }
@@ -190,7 +190,7 @@ func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
 	// Get pupal user
-	pu := context.Get(r, "PupalUser").(PupalUser)
+	pu := context.Get(r, "PupalUser").(*PupalUser)
 	// and UID
 	uid := context.Get(r, "UID").(string)
 
@@ -200,41 +200,47 @@ func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainJoinHandler")
 		return
 	}
-	var domain Domain
-	if err := datastore.Get(c, dKey, &domain); err != nil {
-		NewError(w, 500, "Failed to get the domain from the datastore", err, "DomainJoinHandler")
-		return
-	}
+	domain := NewDomain()
 
-	// Handle case of user joining a private domain
-	if !domain.Public {
-		err := errors.New("User is joining a private domain which is not implemented yet.")
-		NewError(w, http.StatusNotImplemented, "Private domain error", err, "DomainJoinHandler")
-		return
-	}
+	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
+		if err := datastore.Get(c, dKey, domain); err != nil {
+			return err
+		}
 
-	// Update pupal user in datastore & memcache. No transaction needed.
-	pu.Domains = append(pu.Domains, dKey)
-	if _, err := datastore.Put(c, pu.Key, &pu); err != nil {
-		NewError(w, 500, "Failed to update the domains of pupal user", err, "DomainJoinHandler")
-		return
-	}
-	if err := SetCache(c, uid, pu); err != nil {
-		NewError(w, 500, "Failed to update cache of pupal user", err, "DomainJoinHandler")
-		return
-	}
+		// Handle case of user joining a private domain
+		if !domain.Public {
+			err := errors.New("User is joining a private domain which is not implemented yet.")
+			return err
+		}
 
-	// Create the user
-	u := User{
-		Name:    pu.Name,
-		Email:   pu.Email,
-		Photo:   pu.Photo,
-		PupalId: pu.Key.Encode(),
-	}
+		// Update pupal user in datastore & memcache. No transaction needed.
+		puDomainSet := NewKeySet(pu.Domains)
+		puDomainSet.Add(dKey)
+		pu.Domains = puDomainSet.GetSlice()
+		if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+			return err
+		}
+		if err := SetCache(c, uid, pu); err != nil {
+			return err
+		}
 
-	// Add user as descendent of domain with stringID as uid
-	if _, err := datastore.Put(c, datastore.NewKey(c, "User", uid, 0, dKey), &u); err != nil {
-		NewError(w, 500, "Failed to add user as a child of domain", err, "DomainJoinHandler")
+		// Create the user
+		u := &User{
+			Name:    pu.Name,
+			Email:   pu.Email,
+			Photo:   pu.Photo,
+			PupalId: pu.Key.Encode(),
+		}
+
+		// Add user as descendent of domain with stringID as uid
+		if _, err := datastore.Put(c, datastore.NewKey(c, "User", uid, 0, dKey), u); err != nil {
+			return err
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		NewError(w, 500, "Failed to complete transaction", err, "DomainJoinHandler")
 		return
+
 	}
 }
