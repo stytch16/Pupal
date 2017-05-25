@@ -71,6 +71,9 @@ body {
 /* end navbar */
 
 /* begin home */
+.user-edit-icon {
+	font-size: 18px;
+}
 /* end home */
 
 /* begin domain */
@@ -137,14 +140,14 @@ body {
 #proj-modal .modal-title {
 	margin: 50px 50px;
 }
-#proj-modal .proj-author-image {
+#proj-modal .proj-collab-image {
 	display: inline-block;
 	border-radius: 50%;
 	margin: 1em;
 	width: 50px;
 	height: 50px;
 }
-#proj-modal .author-info-contact {
+#proj-modal .collab-info-contact {
 	display: inline-block;
 }
 /* end projmodal */

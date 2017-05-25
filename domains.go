@@ -130,9 +130,11 @@ func DomainGetMemberHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if NewKeySet(pu.Domains).Exist(dKey) {
-		w.Write([]byte("true"))
-		return
+	for _, domain := range pu.Domains {
+		if dKey.Equal(domain) {
+			w.Write([]byte("true"))
+			return
+		}
 	}
 	w.Write([]byte("false"))
 }
@@ -161,12 +163,12 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 	// Return basic data in json
 	w.Header().Set("Content-Type", "application/json")
 	type d struct {
-		Id            string   `json:"id"`
-		Title         string   `json:"title"`
-		Description   string   `json:"description"`
-		Tags          []string `json:"tags"`
-		NumSubscribes int      `json:"num_subscribes"`
-		Date          string   `json:"date"`
+		Id          string   `json:"id"`
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Tags        []string `json:"tags"`
+		Likes       int      `json:"likes"`
+		Date        string   `json:"date"`
 	}
 	entries := make([]d, len(dProjs))
 	for i, dp := range dProjs {
@@ -174,7 +176,7 @@ func DomainProjectListHandler(w http.ResponseWriter, r *http.Request) {
 		entries[i].Title = dp.Title
 		entries[i].Description = dp.Description
 		entries[i].Tags = dp.Tags
-		entries[i].NumSubscribes = len(dp.Subscribers)
+		entries[i].Likes = dp.Likes
 		entries[i].Date = dp.CreatedAt.Format("Mon Jan 2, 2006 15:04 MST")
 	}
 	if err := json.NewEncoder(w).Encode(&entries); err != nil {
@@ -194,15 +196,16 @@ func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 	// and UID
 	uid := context.Get(r, "UID").(string)
 
-	// Get domain
+	// Decode domain id in url
 	dKey, err := datastore.DecodeKey(id)
 	if err != nil {
 		NewError(w, 500, "Failed to decode the domain id in the url", err, "DomainJoinHandler")
 		return
 	}
-	domain := NewDomain()
 
+	domain := NewDomain()
 	err = datastore.RunInTransaction(c, func(c ctx.Context) error {
+		// Get the domain
 		if err := datastore.Get(c, dKey, domain); err != nil {
 			return err
 		}
@@ -213,23 +216,22 @@ func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		// Update pupal user in datastore & memcache. No transaction needed.
-		puDomainSet := NewKeySet(pu.Domains)
-		puDomainSet.Add(dKey)
-		pu.Domains = puDomainSet.GetSlice()
-		if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+		// Update pupal user in datastore & memcache
+		pu.Domains = append(pu.Domains, dKey)
+		puKey, _ := datastore.DecodeKey(pu.Id)
+		if _, err = datastore.Put(c, puKey, pu); err != nil {
 			return err
 		}
-		if err := SetCache(c, uid, pu); err != nil {
+		if err = SetCache(c, uid, pu); err != nil {
 			return err
 		}
 
 		// Create the user
 		u := &User{
-			Name:    pu.Name,
-			Email:   pu.Email,
-			Photo:   pu.Photo,
-			PupalId: pu.Key.Encode(),
+			UID:   uid,
+			Name:  pu.Name,
+			Email: pu.Email,
+			Photo: pu.Photo,
 		}
 
 		// Add user as descendent of domain with stringID as uid
@@ -237,10 +239,23 @@ func DomainJoinHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		return nil
-	}, nil)
+	}, &datastore.TransactionOptions{XG: true})
 	if err != nil {
 		NewError(w, 500, "Failed to complete transaction", err, "DomainJoinHandler")
 		return
+	}
 
+	// Send JSON response
+	w.Header().Set("Content-Type", "application/json")
+	d := struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}{
+		Id:   id,
+		Name: domain.Name,
+	}
+	if err := json.NewEncoder(w).Encode(&d); err != nil {
+		NewError(w, 500, "Failed to encode the json response", err, "DomainJoinHandler")
+		return
 	}
 }

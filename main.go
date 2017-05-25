@@ -11,7 +11,7 @@ import (
 	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/urlfetch"
 
-	gorCtx "github.com/gorilla/context"
+	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 	firebase "github.com/wuman/firebase-server-sdk-go"
@@ -39,23 +39,18 @@ func init() {
 	// Project handlers
 	projectRouter := mux.NewRouter().PathPrefix("/projects").Subrouter()
 	projectRouter.HandleFunc("/{id}", ProjectGetHandler).Methods("GET")
-	projectRouter.HandleFunc("/{id}/comment", ProjectCommentHandler).Methods("POST")
-	projectRouter.HandleFunc("/{id}/subscribe", ProjectSubsHandler).Methods("GET")
-
+	projectRouter.HandleFunc("/{id}/like", ProjectLikeHandler).Methods("GET")
+	projectRouter.HandleFunc("/{id}/newCollab", ProjectNewCollabHandler).Methods("POST")
 	// Host project handlers
 	projectRouter.HandleFunc("/{domain}/host", ProjectHostPostHandler).Methods("POST")
-
 	// Project routes middleware
 	r.PathPrefix("/projects").Handler(common.With(negroni.Wrap(projectRouter)))
 
 	// User handlers
 	userRouter := mux.NewRouter().PathPrefix("/users").Subrouter()
 	userRouter.HandleFunc("/registerPupalUser", UserRegisterPupalHandler).Methods("POST")
-	userRouter.HandleFunc("/registerDomain", UserRegisterDomainHandler).Methods("POST")
-	userRouter.HandleFunc("/delete", UserDeleteHandler).Methods("GET")
+	userRouter.HandleFunc("/projects", UserGetProjectsHandler).Methods("GET")
 	userRouter.HandleFunc("/{id}", UserGetHandler).Methods("GET")
-	userRouter.HandleFunc("/{id}/message", UserMsgHandler).Methods("POST")
-
 	// User routes middleware
 	r.PathPrefix("/users").Handler(common.With(negroni.Wrap(userRouter)))
 
@@ -73,22 +68,16 @@ func init() {
 
 	// Profile handlers
 	profileRouter := mux.NewRouter().PathPrefix("/profile").Subrouter()
-	profileRouter.HandleFunc("/", ProfileHandler).Methods("GET")
-	profileRouter.HandleFunc("/", ProfilePostHandler).Methods("POST")
-	profileRouter.HandleFunc("/projects", ProfileProjectsHandler).Methods("GET")
-	profileRouter.HandleFunc("/projects/{id}", ProfileProjectsPostHandler).Methods("PUT")
-	profileRouter.HandleFunc("/projects/{id}", ProfileProjectsDeleteHandler).Methods("DELETE")
-	profileRouter.HandleFunc("/subscriptions", ProfileSubsHandler).Methods("GET")
-	profileRouter.HandleFunc("/subscriptions/{id}", ProfileSubsDeleteHandler).Methods("DELETE")
-
+	profileRouter.HandleFunc("/user", ProfileHandler).Methods("GET")
+	profileRouter.HandleFunc("/edit", ProfilePostEditHandler).Methods("POST")
 	// Profile routes middleware
 	r.PathPrefix("/profile").Handler(common.With(negroni.Wrap(profileRouter)))
 
 	// Admin routes
 	adminRouter := mux.NewRouter().PathPrefix("/admin").Subrouter()
 	adminRouter.HandleFunc("/domain/add", AdminAddDomainHandler).Methods("POST")
-	adminRouter.HandleFunc("/users/add", AdminAddPupalUserHandler).Methods("POST")
-	adminRouter.HandleFunc("/projects/add", AdminAddProjectHandler).Methods("POST")
+	//adminRouter.HandleFunc("/users/add", AdminAddPupalUserHandler).Methods("POST")
+	//adminRouter.HandleFunc("/projects/add", AdminAddProjectHandler).Methods("POST")
 	adminRouter.HandleFunc("/pupalusers", AdminGetUsersHandler).Methods("GET")
 
 	// Admin routes middleware
@@ -112,7 +101,7 @@ func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 		return
 	}
 	uid, _ := token.UID()
-	gorCtx.Set(r, "UID", uid) // context.Get(r, "UID").(string) to retrieve it
+	context.Set(r, "UID", uid) // context.Get(r, "UID").(string) to retrieve it
 	next(w, r)
 }
 
@@ -121,16 +110,18 @@ func ValidateToken(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 // then the user must be registered to datastore by a POST /user/registerPupalUser
 func GetUserFromCache(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	c := appengine.NewContext(r)
-	uid := gorCtx.Get(r, "UID").(string)
+	uid := context.Get(r, "UID").(string)
 
 	pu := NewPupalUser()
 	if _, err := memcache.Gob.Get(c, uid, pu); err == memcache.ErrCacheMiss {
 		// Grab from datastore
-		pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-		if err := datastore.Get(c, pu.Key, pu); err == datastore.ErrNoSuchEntity {
+		puKey := datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
+		if err := datastore.Get(c, puKey, pu); err == datastore.ErrNoSuchEntity {
 			// User is entirely new and must be added to datastore by a POST /user/registerPupalUser request
 			// For now we initialize pupal user with empty fields inside datastore.
-			if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+			pu.Id = puKey.Encode()
+			pu.UID = uid
+			if _, err := datastore.Put(c, puKey, pu); err != nil {
 				NewError(w, 500, "Failed to put new user inside the datastore", err, "GetUserFromCache")
 				return
 			}
@@ -139,6 +130,8 @@ func GetUserFromCache(w http.ResponseWriter, r *http.Request, next http.HandlerF
 			return
 		} else {
 			// Set memcache with pupal user from datastore
+			pu.Id = puKey.Encode()
+			pu.UID = uid
 			if err := SetCache(c, uid, pu); err != nil {
 				NewError(w, 500, "Failed to set pupal user in memcache", err, "GetUserFromCache")
 				return
@@ -148,7 +141,7 @@ func GetUserFromCache(w http.ResponseWriter, r *http.Request, next http.HandlerF
 		NewError(w, 500, "Failed to get the pupal user from memcache", err, "GetUserFromCache")
 		return
 	}
-	gorCtx.Set(r, "PupalUser", pu) // context.Get(r, "PupalUser").(PupalUser) to retrieve it
+	context.Set(r, "PupalUser", pu) // context.Get(r, "PupalUser").(*PupalUser) to retrieve it
 	next(w, r)
 }
 

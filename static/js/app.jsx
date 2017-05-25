@@ -21,9 +21,8 @@ class App extends React.Component {
 	handleGoogleBtnClick() {
 		var provider = new firebase.auth.GoogleAuthProvider();
 		firebase.auth().signInWithPopup(provider).then(function(result) {
-			console.log(result.user.displayName + " has signed in using Google.");
 			}, function(error) {
-				console.log("Error authenticating thru Google (" + error.code + "): " + error.message);
+				alert("Error authenticating thru Google (" + error.code + "): " + error.message);
 				return;
 			});
 	}
@@ -32,19 +31,18 @@ class App extends React.Component {
 		firebase.auth().signInWithPopup(provider).then(function(result) {
 			console.log(result.user.displayName + " has signed in using FB.");
 			}, function(error) {
-				console.log("Error authenticating thru FB (" + error.code + "): " + error.message);
+				alert("Error authenticating thru Facebook (" + error.code + "): " + error.message);
 				return;
 			});
 	}
 	handleLogoutClick() {
 		if (this.state.loggedIn) {
 			firebase.auth().signOut().then(function() {
-				console.log("User has signed out");
 			}, function(error) {
-				console.log("Error logging user out (" + error.code + "): " + error.message);
+				alert("Error logging user out (" + error.code + "): " + error.message);
 			});
 		} else {
-			console.log("Error logging user out (500): User state was lost");
+			alert("Error logging user out (500): User state was lost");
 		}
 	}
 	render() {
@@ -160,21 +158,19 @@ class UserDomains extends React.Component {
 	constructor(props) {
 		super(props);
 		this.state = {
-			domains: null
+			domains: []
 		};
 	}
 	componentDidMount() {
-		const setDomains = (res) => { this.setState({domains: res}) }
-		firebase.auth().currentUser.getToken(true).then(function(token) {
-			$.ajax({
-				url: "/domain/userlist",
-				type: "GET",
-				beforeSend: function(xhr){
-					xhr.setRequestHeader('Authorization', token);
-				},
-				success: (res) => setDomains(res)
-			});
-		});
+		const updateUserDomains = (domains) => { this.setState({domains: domains}) };
+		var ref = firebase.database().ref("users/" + firebase.auth().currentUser.uid + "/domains")
+		if (ref) {
+			let domains = this.state.domains
+			ref.on('child_added', function(snapshot) {
+				domains.push(snapshot.val())
+				updateUserDomains(domains)
+			})
+		}
 	}
 	render() {
 		return (
@@ -196,17 +192,31 @@ class Home extends React.Component {
 		super(props);
 		this.state = {
 			initialDomains: [], // list of all domains
-			filteredDomains: [] // list of updated domains based on user input
+			filteredDomains: [], // list of updated domains based on user input
+			messages: []
 		};
-
 		this.filterList = this.filterList.bind(this);
 	}
 	componentDidMount() {
-		var user = firebase.auth().currentUser;
-
+		this.registerSignIn(firebase.auth().currentUser)
+		this.getDomainList()
+		this.setMessagesListener()
+	}
+	setMessagesListener() {
+		const updateMessages = (messages) => { this.setState({messages: messages}) };
+		var ref = firebase.database().ref("users/" + firebase.auth().currentUser.uid + "/messages")
+		if (ref) {
+			let messages = this.state.messages
+			ref.on('child_added', function(data) {
+				messages.unshift(data.val())
+				updateMessages(messages)
+			});
+		}
+	}
+	getDomainList() {
 		const setDomains = (res) => { this.setState({initialDomains: res}); }
-		// Get JSON array of id:name pairs of domain listing
-		user.getToken(true).then(function(token) {
+		// Get JSON arry of id:name pairs of domain listing
+		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
 				url: "/domain/list",
 				type: "GET",
@@ -215,18 +225,17 @@ class Home extends React.Component {
 				success: (res) => setDomains(res)
 			});
 		});
-
+	}
+	registerSignIn(user) {
 		const welcomeNewUser = () => { $('#welcome-pupal-modal').modal('toggle'); }
-		// Read user's record on firebase db. 
-		// If nonexistent, register pupal user on GAE datastore.
-		// If exist but no associated domain, show modal dialog to user to join a domain.
 		firebase.database().ref('users/' + user.uid).once('value').then(function(snapshot) {
+			// If nonexistent, register pupal user on Firebase DB and GAE datastore.
 			if (snapshot.val() === null) {
-				console.log("User is new");
 				firebase.database().ref('users/'+user.uid).set({
-					domain: false,
+					name: user.displayName,
 					email: user.email,
-					messages: []
+					photo: user.photoURL,
+					summary: "No summary provided"
 				});
 				user.getToken(true).then(function(token) {
 					$.ajax({
@@ -244,7 +253,7 @@ class Home extends React.Component {
 						success: () => welcomeNewUser()
 					});
 				});
-			} 
+			}
 		});
 	}
 	filterList(event) {
@@ -258,20 +267,27 @@ class Home extends React.Component {
 			this.setState({filteredDomains: []});
 		}
 	}
+	handleMsgClick(projId, domId, authorUid) {
+		if (projId !== "") {
+			hashHistory.push("/dom/"+domId+"?view=Projects&proj="+projId)
+		} else {
+			hashHistory.push("/user/"+authorUid)
+		}
+	}
 	render() {
-		var user = firebase.auth().currentUser;
 		return (
 			<div className="content home-content">
 				<WelcomePupal />
-				<div className="recent-activity-content col-xs-8">
-					<h3>Recent Activity</h3>
+				<div className="domain-search-content">
+					<h1 className="text-center">Find domains here.</h1>
+					<div className="filtered-list md-form">
+						<input type="text" className="form-control" 
+							placeholder="Search a domain" 
+							onChange={this.filterList} />
+						<List domains={this.state.filteredDomains} />
+					</div>
 				</div>
-				<div className="filtered-list md-form col-xs-4">
-					<input type="text" className="form-control" 
-						placeholder="Search a domain" 
-						onChange={this.filterList} />
-					<List domains={this.state.filteredDomains} />
-				</div>
+				<DomainUpdates onMsgClick={(p, d, a)=>this.handleMsgClick(p, d, a)} messages={this.state.messages}/>
 			</div>
 		);
 	}
@@ -281,7 +297,7 @@ class Home extends React.Component {
 // begin list function component
 function List(props) {
 	function fetchDomLink(id) {
-		return "/dom/" + id + "?view=Info"
+		return "/dom/" + id + "?view=Projects"
 	}
 	return (
 		<div className="list-group" key="domain_listing">
@@ -305,12 +321,18 @@ function WelcomePupal() {
 					<div className="modal-header">
 						<button type="button" className="close" data-dismiss="modal">&times;</button>
 						<h4 className="modal-title">
-							Welcome to Pupal! To get started, join a domain!</h4>
+							Welcome to Pupal! <br/></h4>
 					</div>
 					<div className="modal-body">
 						<p>
+							<h4><i>Join a domain!</i></h4><br/>
 							Your domain can be your school, group and/or organization.<br/>
-							Search for your domain on the right of the page and join!</p>
+							Search for your domain on the right of the page and join!
+							<br/><br/>
+							<h4><i>Visit your profile!</i></h4><br/>
+							Submit a summary about you that other people can read.<br/>
+							Remember to add tags that describe your skills and preferences.<br />
+						</p>
 					</div>
 					<div className="modal-footer">
 						<button type="button" className="btn btn-default" data-dismiss="modal">
@@ -323,6 +345,34 @@ function WelcomePupal() {
 }
 // end welcomepupal component
 
+// begin domainupdates component
+function DomainUpdates(props) {
+	if (props.messages !== null && props.messages.length > 0) {
+		return (
+			<div className="domain-activity-content">
+			{
+				props.messages.map((message) => 
+					<div className="domain-message-entry" key={message.body}>
+						<a onClick={()=>props.onMsgClick(message.projId, message.domId, message.authorUid)}>
+							{message.body}
+						</a>
+						<hr></hr>
+					</div>
+				)
+			}
+			</div>
+		);
+	} else {
+		return (
+			<div className="domain-activity-content">
+				<p><i>No activity in your domains.</i></p>
+				<br/>
+			</div>
+		);
+	}
+}
+
+// end domainupdates component
 // begin domain component
 class Domain extends React.Component {
 	constructor(props) {
@@ -352,30 +402,28 @@ class Domain extends React.Component {
 		});
 	}
 	handleMembership(id) {
-		const setMember = (res) => {
-			if (res === "true") {
-				this.setState({member: true})
-			} else {
-				this.setState({member:false})
-			}
-		}
-		firebase.auth().currentUser.getToken(true).then(function(token) {
-			$.ajax({
-				url: "/domain/"+id+"/member",
-				type: "GET",
-				beforeSend: function(xhr){
-					xhr.setRequestHeader('Authorization', token);
-				},
-				success: (res) => setMember(res)
-			});
-		});
-
+		const setMember = () => { this.setState({member: true}) }
+		var user = firebase.auth().currentUser;
+		firebase.database().ref("users/" + user.uid + "/domains").once('value', function(snapshot) {
+			snapshot.forEach(function(childSnapshot) {
+				if (childSnapshot.val().id === id) {
+					setMember()
+				}
+			})
+		})
 	}
 	handleJoin(id) {
-		const setJoinState = () => { 
-			this.setState({member:true})
-		};
 		var user = firebase.auth().currentUser;
+		const setJoinState = (res) => { 
+			this.setState({member: true})
+			// Append to user's domain list in firebase
+			var newDomainRef = firebase.database().ref('users/' + user.uid + '/domains').push()
+			newDomainRef.set({
+				id: res.id,
+				name: res.name
+			});
+		};
+		// Send a request for user to join the domain
 		user.getToken(true).then(function(token) {
 			$.ajax({
 				url: "/domain/"+id+"/join",
@@ -383,11 +431,8 @@ class Domain extends React.Component {
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('Authorization', token);
 				},
-				success: () => setJoinState()
+				success: (res) => setJoinState(res)
 			});
-		});
-		firebase.database().ref('users/' + user.uid).update({
-			domain: true
 		});
 	}
 	render() {
@@ -426,9 +471,7 @@ class Domain extends React.Component {
 
 // begin domainview component
 function DomainView(props) {
-	if (props.view === "Info") {
-		return <Info id={props.id} />
-	} else if (props.view === "Projects") {
+	if (props.view === "Projects") {
 		return <Projects id={props.id} proj={props.proj} />
 	} else if (props.view === "Users") {
 		return <Users id={props.id} />
@@ -464,29 +507,18 @@ class DomainNavbar extends React.Component{
 				</div>
 				<div id="domain-navbar-content" className="navbar-collapse collapse">
 					<ul className="nav navbar-nav">
-						<li className={this.isActive('Info')}>
-							<Link to={this.fetchViewLink(this.props.id, "Info")}>Info</Link></li>
 						<li className={this.isActive('Projects')}>
 							<Link to={this.fetchViewLink(this.props.id, "Projects")}>Projects</Link></li>
 						<li className={this.isActive('Users')}>
 							<Link to={this.fetchViewLink(this.props.id, "Users")}>Users</Link></li>
-						<li className={this.isActive('Comments')}><a href="#">Comments</a></li>
 					</ul>
 					<ul className="nav navbar-nav navbar-right">
-						<li className="dropdown">
-							<a className="dropdown-toggle" data-toggle="dropdown" role="button" 
-								aria-haspopup="true" aria-expanded="false">
-								Actions<i className="fa fa-bars" aria-hidden="true"></i></a>
-							<ul className="dropdown-menu">
-								{!this.props.member && <li><a onClick={()=>this.props.onJoinClick(this.props.id)}>
-									<i className="fa fa-tags" aria-hidden="true"></i>
-									Request to join</a></li>}
-								<li role="separator" className="divider"></li>
-								{this.props.member && <li><Link to={this.fetchViewLink(this.props.id, "Host")}>
-									<i className="fa fa-paper-plane" aria-hidden="true"></i>
-									Host a project</Link></li>}
-							</ul>
-						</li>
+						{!this.props.member && <li><a onClick={()=>this.props.onJoinClick(this.props.id)}>
+							<i className="fa fa-tags" aria-hidden="true"></i>
+							Request to join</a></li>}
+						{this.props.member && <li><Link to={this.fetchViewLink(this.props.id, "Host")}>
+							<i className="fa fa-paper-plane" aria-hidden="true"></i>
+							Host a project</Link></li>}
 					</ul>
 				</div>
 			</div>
@@ -496,18 +528,6 @@ class DomainNavbar extends React.Component{
 }
 // end domain navbar function component
 
-// begin info component
-class Info extends React.Component {
-	render() {
-		return (
-			<div className="info-content">
-				<h2>Display domain of id={this.props.id} info here!</h2>
-			</div>
-		)
-	}
-}
-// end info component
-
 // begin projects component
 class Projects extends React.Component {
 	constructor(props) {
@@ -515,7 +535,7 @@ class Projects extends React.Component {
 		this.state = {
 			projects: [],
 			proj: null,
-			subClick: false
+			likeClick: false
 		};
 	}
 	componentDidMount() {
@@ -551,34 +571,36 @@ class Projects extends React.Component {
 			});
 		}
 	}
-	handleProjSubClick(id) {
-		const toggleSubClick = () => { 
-			this.setState({subClick: !this.state.subClick}) 
-		}
-		if (!this.state.proj.is_subscriber) {
-			firebase.auth().currentUser.getToken(true).then(function(token) {
-				$.ajax({
-					url: "/projects/"+id+"/subscribe",
-					type: "GET",
-					beforeSend: function(xhr){
-						xhr.setRequestHeader('Authorization', token);
-					},
-					success: () => toggleSubClick()
-				});
+	sendUpdates(uids, msg, projId, domId, author) {
+		for (let uid of uids) {
+			var newMsgRef = firebase.database().ref('users/' + uid + '/messages').push()
+			newMsgRef.set({
+				body: msg,
+				projId: projId,
+				domId: domId,
+				authorUid: author
 			});
-		} else {
-			firebase.auth().currentUser.getToken(true).then(function(token) {
-				$.ajax({
-					url: "/projects/"+id+"/unsubscribe",
-					type: "GET",
-					beforeSend: function(xhr){
-						xhr.setRequestHeader('Authorization', token);
-					},
-					success: () => toggleSubClick()
-				});
-			});
-
 		}
+	}
+	handleLikeClick(id) {
+		const updateLike = (res) => { 
+			this.setState({likeClick: true}) 
+			var newLikeRef = firebase.database().ref('users/' + firebase.auth().currentUser.uid + '/likes').push()
+			newLikeRef.set({
+				projId: id
+			});
+			this.sendUpdates(res.collab_uids, res.msg, "", "", firebase.auth().currentUser.uid)
+		}
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "/projects/"+id+"/like",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => updateLike(res)
+			});
+		});
 	}
 	handleUserClick(id) {
 		// Redirect to the user page
@@ -588,8 +610,8 @@ class Projects extends React.Component {
 		return (
 			<div className="projects-content">
 				<ProjModal proj={this.state.proj} 
-					subClick={this.state.subClick}
-					onProjSubClick={()=>this.handleProjSubClick(this.state.proj.id)}
+					likeClick={this.state.likeClick}
+					onProjLikeClick={()=>this.handleLikeClick(this.state.proj.id)}
 					onUserClick={(id)=>this.handleUserClick(id)}/>
 				<div className="project-group" key="projects-listing">
 				{
@@ -601,7 +623,7 @@ class Projects extends React.Component {
 								<h3 className="card-title">{proj.title}</h3>
 								<div className="card-text">
 									<p className="num-subscribes-text">
-										<i>{proj.num_subscribes} subscriber(s)</i></p>
+										<i>{proj.likes} like(s)</i></p>
 									<br />
 									<p className="desc-text">{proj.description}</p>
 									{proj.tags !== null && proj.tags.length > 0 && proj.tags.map((tag) => 
@@ -639,11 +661,11 @@ function ProjModal(props) {
 							{
 							!props.proj.is_collaborator && 
 								<button type="button" className="btn btn-default btn-circle btn-lg"
-									onClick={()=>props.onProjSubClick()}>
+									onClick={()=>props.onProjLikeClick()}>
 									{
-									(!props.proj.is_subscriber && !props.subClick) ? 
-										<i className="fa fa-star-o" aria-hidden="true"></i> 
-										: <i className="fa fa-star" aria-hidden="true"></i> 
+									(!props.proj.has_liked && !props.likeClick) ? 
+										<i className="fa fa-thumbs-o-up" aria-hidden="true"></i> 
+										: <i className="fa fa-thumbs-up" aria-hidden="true"></i> 
 									}
 								</button>
 							}
@@ -665,16 +687,21 @@ function ProjModal(props) {
 								<h4>{props.proj.description}</h4>
 								<br/>
 							</div>
-							<div className="author-info">
-								<a onClick={()=>props.onUserClick(props.proj.author.pupal_id)} 
-									data-dismiss="modal" >
-									<img className="proj-author-image img-fluid" 
-										src={props.proj.author.photo} alt={props.proj.author.name}></img>
-									<div className="author-info-contact">
-										<h4>{props.proj.author.name}</h4>
-									</div>
-								</a>
-								<br/><br/>
+							<div className="collaborator-content">
+								{
+								props.proj.collaborators.map((collab) =>
+									<div className="collab-entry" key={collab.uid}>
+									<a onClick={()=>props.onUserClick(collab.uid)} 
+										data-dismiss="modal" >
+										<img className="proj-collab-image img-fluid" 
+											src={collab.photo} alt={collab.name}></img>
+										<div className="collab-info-contact">
+											<h4>{collab.name}</h4>
+										</div>
+									</a>
+									<br/><br/>
+									</div>)
+								}
 							</div>
 						</div>
 						<div className="modal-footer">
@@ -694,7 +721,7 @@ class Users extends React.Component {
 	render() {
 		return (
 		<div className="users-content">
-			<h2>Display domain of id={this.props.id} users here!</h2>
+			<h2>Coming soon!</h2>
 		</div>
 		);
 	}
@@ -763,11 +790,23 @@ class Host extends React.Component {
 			this.setState({websiteFeedback: 'Website does not look correct. Enter \'NA\' if you do not have one now.', websiteValid: false});
 		}
 	}
+	sendUpdates(uids, msg, projId, domId, author) {
+		for (let uid of uids) {
+			var newMsgRef = firebase.database().ref('users/' + uid + '/messages').push()
+			newMsgRef.set({
+				body: msg,
+				projId: projId,
+				domId: domId,
+				authorUid: author
+			});
+		}
+	}
 	handleSubmitClick(id, titl, desc, ts, web) {
 		const setProject = (res) => {
 			$('#failure-alert').hide();
 			$('#success-alert').show();
-			this.setState({projId: res})
+			this.setState({projId: res.proj_id})
+			this.sendUpdates(res.updated_uids, res.msg, res.proj_id, id, firebase.auth().currentUser.uid)
 		};
 		if (this.state.titleValid && this.state.descValid && this.state.websiteValid) {
 			firebase.auth().currentUser.getToken(true).then(function(token) {
@@ -826,6 +865,7 @@ class Host extends React.Component {
 					<p id="titleHelp" className="form-text text-muted">
 						{this.state.titleFeedback}</p>
 				</div>
+				<hr></hr>
 				<div className="form-group">
 					<label htmlFor="descriptionInput"><h3>Description</h3></label>
 					<textarea value={this.state.description} 
@@ -837,6 +877,7 @@ class Host extends React.Component {
 					<p id="descriptionHelp" className="form-text text-muted">
 						{this.state.descFeedback}</p>
 				</div>
+				<hr></hr>
 				<div className="form-group">
 					<label htmlFor="teamSizeInput"><h3>Size of project team</h3></label>
 					<select value={this.state.teamSize} 
@@ -850,6 +891,7 @@ class Host extends React.Component {
 					<p id="descriptionHelp" className="form-text text-muted">
 						{this.state.teamSizeFeedback}</p>
 				</div>
+				<hr></hr>
 				<div className="form-group">
 					<label htmlFor="websiteInput"><h3>Got a website?</h3></label>
 					<input type="text" 
@@ -894,25 +936,78 @@ class User extends React.Component {
 	constructor(props) {
 		super(props);
 		this.state = {
-			user: null
+			user: null,
+			domains: [],
+			ownership: false,
 		};
 	}
-	componentDidMount() {
-		this.getPupalUser(this.props.params.id)
+	componentWillMount() {
+		this.setOwnership()
 	}
-	getPupalUser(id) {
-		const setUser = (res) => {
-			this.setState({user: res})
+	setOwnership() {
+		if (this.props.params.id === firebase.auth().currentUser.uid) {
+			this.setState({ownership: true})
+		}
+	}
+	componentDidMount() {
+		this.getUser(this.props.params.id)
+	}
+	getUser(id) {
+		const updateUser = (user) => { 
+			this.setState({user: user}) 
+		}
+		const updateDomains = (domains) => { this.setState({domains: domains}) }
+
+		firebase.database().ref("users/"+this.props.params.id).once('value', function(snapshot) {
+			updateUser(snapshot.val())
+		});
+
+		let domains = this.state.domains
+		firebase.database().ref("users/"+this.props.params.id+"/domains").once('value', function(snapshot) {
+			snapshot.forEach(function(childSnapshot) {
+				domains.push(childSnapshot.val().name)
+			})
+			updateDomains(domains)
+		});
+	}
+	handleSend(msg) {
+		var newMsgRef = firebase.database().ref('users/' + this.props.params.id + '/messages').push()
+		msg = firebase.auth().currentUser.displayName + ": " + msg
+		newMsgRef.set({
+			body: msg,
+			projId: "",
+			domId: "",
+			authorUid: firebase.auth().currentUser.uid
+		});
+		$('#message-sent-popover').popover('toggle')
+	}
+	sendUpdates(uids, msg, projId, domId, author) {
+		for (let uid of uids) {
+			var newMsgRef = firebase.database().ref('users/' + uid + '/messages').push()
+			newMsgRef.set({
+				body: msg,
+				projId: projId,
+				domId: domId,
+				authorUid: author
+			});
+		}
+	}
+	handleProjClick(id, uid) {
+		const setUpdates = (res) => {
+			$('#new-collab-popover').popover('toggle')
+			this.sendUpdates(res.uids, res.msg, res.proj_id, res.dom_id, firebase.auth().currentUser.uid)
 		}
 		firebase.auth().currentUser.getToken(true).then(function(token) {
 			$.ajax({
-				url: "/users/"+id,
-				type: "GET",
+				url: "projects/"+id+"/newCollab",
+				type: "POST",
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('Authorization', token);
 				},
-				success: (res) => setUser(res)
+				data: {uid: uid},
+				success: (res) => setUpdates(res)
 			});
+			
 		});
 	}
 	render() {
@@ -924,32 +1019,149 @@ class User extends React.Component {
 						<h1 id="user-profile-name">{this.state.user.name}</h1>
 					</div>
 					<div className="body col-xs-8">
-						<br /><br />
+						<hr></hr>
 						<h4 id="user-profile-summary">{this.state.user.summary}</h4>
-						<br /><br />
+						<hr></hr>
+						{
+						(this.state.domains.length > 0) && 
+							<div className="user-domain-content">
+								<h4>Domains joined</h4>
+								<div className="user-domains">
+								{
+									this.state.domains.map((dom) =>
+									<div className="user-dom" key={dom}>
+										<p><i className="fa fa-university" aria-hidden="true"></i>{dom}</p>
+									</div>
+									)
+								}
+								</div>
+							</div>
+						}
 					</div>
-				</div>
-			)
-		} else {
-			return (
-				<div className="content user-content">
-					Loading...
+					{ 
+					!this.state.ownership && 
+						<UserMessageForm onSend={(body)=>{this.handleSend(body)}} />
+					}
+					{
+					!this.state.ownership && 
+						<CollaborationInvite onProjClick={(id)=>this.handleProjClick(id, this.props.params.id)} />
+					}
 				</div>
 			)
 		}
+		return (
+			<div className="content user-content">
+				Loading...
+			</div>
+		)
 	}
 }
 // end user component
 
-// begin profile component
-class Profile extends React.Component {
+// begin messageform component
+class UserMessageForm extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			body: "",
+			valid: false
+		};
+		this.handleMsgChange = this.handleMsgChange.bind(this)
+	}
+	handleMsgChange(event) {
+		this.setState({body: event.target.value});
+		if (event.target.value.length > 0) {
+			this.setState({valid: true})
+		} else {
+			this.setState({valid: false})
+		}
+	}
+	checkMessageClick() {
+		if (this.state.valid) {
+			this.props.onSend(this.state.body)
+		}
+	}
 	render() {
 		return (
-			<div className="content profile_content">
-				<h2>Display profile here</h2>
+			<div className="message-form-content">
+				<textarea value={this.state.body} 
+					onChange={this.handleMsgChange} 
+					className="form-control" id="user-message-form-textarea" 
+					rows="5" 
+					placeholder="Enter your message here.">
+				</textarea>
+				<div id="submit-buttons">
+					<a onClick={()=>this.checkMessageClick()} type="button" tabIndex="0" className="btn btn-success"
+						id="message-sent-popover" data-toggle="popover" data-trigger="focus" data-content="Message sent!">
+						<i className="fa fa-check" aria-hidden="true"></i>Send message</a>
+				</div>
 			</div>
 		);
 	}
+}
+// end messageform component
+
+// begin collaborationinvite component
+class CollaborationInvite extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			projects: [],
+			projId: null
+		};
+		this.handleProjId = this.handleProjId.bind(this)
+	}
+	componentDidMount() {
+		const setProjects = (res) => { this.setState({projects: res})}
+		firebase.auth().currentUser.getToken(true).then(function(token) {
+			$.ajax({
+				url: "users/projects",
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('Authorization', token);
+				},
+				success: (res) => setProjects(res)
+			});
+		});
+	}
+	handleProjId(event) {
+		this.setState({projId: event.target.value})
+	}
+	render() {
+		if (this.state.projects.length > 0) {
+			return (
+			<div className="collaboration-invite-content">
+				<hr></hr>
+				<h3>Add as collaborator</h3>
+				<select value={this.state.projId} 
+					onChange={this.handleProjId}>
+					<option value=""></option>
+					{
+					this.state.projects.map((proj) => 
+						<option key={proj.id} value={proj.id}>{proj.name}</option>
+					)
+					}
+				</select>
+				{this.state.projId !== null && this.state.projId.length > 0 && 
+				<a onClick={()=>this.props.onProjClick(this.state.projId)} type="button" tabIndex="0" className="btn btn-success"
+					id="new-collab-popover" data-toggle="popover" data-trigger="focus" data-content="Added new collaboration!">
+					<i className="fa fa-handshake-o" aria-hidden="true"></i>Confirm</a>}
+			</div>
+			);
+		}
+		return null
+	}
+}
+// end collaborationinvite component
+
+
+// begin profile component
+function Profile()  {
+	return (
+		<div className="content profile-content">
+			Coming soon!
+		</div>
+	);
 }
 // end profile component
 
@@ -975,7 +1187,7 @@ var { Router,
 // Use this.props.params.id to access URL id parameter.
 // If query string /foo?bar=baz, use this.props.location.query.bar to get value of bar -> baz
 
-// Query options -> dom/:id?view=Info dom/:id?view=Projects dom/:id?view=Projects&proj=<id> dom/:id?view=Users dom/:id?view=Host
+// Query options -> dom/:id?view=Projects dom/:id?view=Projects&proj=<id> dom/:id?view=Users dom/:id?view=Host
 ReactDOM.render((
 	<Router history={hashHistory}>
 		<Route path="/" component={App}>

@@ -18,7 +18,9 @@ import (
 func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	// Get the uid to use as stringId for new pupal user's key
+	// Get pupal user
+	pu := context.Get(r, "PupalUser").(*PupalUser)
+	// and UID
 	uid := context.Get(r, "UID").(string)
 
 	// Read POST body
@@ -29,12 +31,16 @@ func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the pupal user
-	pu := NewPupalUser()
 	json.Unmarshal(body, pu)
 
 	// Put pupal user into datastore and memcache
-	pu.Key = datastore.NewKey(c, "PupalUser", uid, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
-	if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+	puKey, err := datastore.DecodeKey(pu.Id)
+	if err != nil {
+		NewError(w, 500, "Failed to decode the pupal id", err, "UserRegisterPupalHandler")
+		return
+
+	}
+	if _, err := datastore.Put(c, puKey, pu); err != nil {
 		NewError(w, 500, "Failed to put pupal user into datastore", err, "UserRegisterPupalHandler")
 		return
 	}
@@ -42,16 +48,6 @@ func UserRegisterPupalHandler(w http.ResponseWriter, r *http.Request) {
 		NewError(w, 500, "Failed to put pupal user into cache", err, "UserRegisterPupalHandler")
 		return
 	}
-}
-
-func UserRegisterDomainHandler(w http.ResponseWriter, r *http.Request) {
-	// c := appengine.NewContext(r)
-	// uid := context.Get(r, "UID").(string)
-	w.Write([]byte("UserRegisterDomainHandler"))
-}
-
-func UserDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("UserDeleteHandler"))
 }
 
 // UserGetHandler returns json info of the user given id in url
@@ -105,7 +101,7 @@ func UserGetHandler(w http.ResponseWriter, r *http.Request) {
 		Email    string    `json:"email"`
 		Photo    string    `json:"photo"`
 		Summary  string    `json:"summary"`
-		Skills   []string  `json:"skills"`
+		Tags     []string  `json:"tags"`
 		Projects []Project `json:"projects"`
 		Domains  []Domain  `json:"domains"`
 	}{
@@ -113,7 +109,7 @@ func UserGetHandler(w http.ResponseWriter, r *http.Request) {
 		Email:    pu.Email,
 		Photo:    pu.Photo,
 		Summary:  pu.Summary,
-		Skills:   pu.Skills,
+		Tags:     pu.Tags,
 		Projects: projects,
 		Domains:  domains,
 	}
@@ -124,6 +120,31 @@ func UserGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func UserMsgHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("UserMsgHandler"))
+func UserGetProjectsHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	// Get pupal user
+	pu := context.Get(r, "PupalUser").(*PupalUser)
+
+	projects := make([]Project, len(pu.Projects))
+	if err := datastore.GetMulti(c, pu.Projects, projects); err != nil {
+		NewError(w, 500, "Failed to get projects", err, "UserGetProjectsHandler")
+		return
+	}
+
+	type d struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+
+	res := make([]d, len(projects))
+	for i, p := range projects {
+		res[i].Id = pu.Projects[i].Encode()
+		res[i].Name = p.Title
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(&res); err != nil {
+		NewError(w, 500, "Failed to encode the json", err, "UserGetProjectsHandler")
+		return
+	}
 }

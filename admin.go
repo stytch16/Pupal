@@ -36,6 +36,7 @@ func AdminAddDomainHandler(w http.ResponseWriter, r *http.Request) {
 	}, "domains")
 }
 
+/*
 func AdminAddPupalUserHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	data, _ := ioutil.ReadAll(r.Body)
@@ -52,7 +53,7 @@ func AdminAddPupalUserHandler(w http.ResponseWriter, r *http.Request) {
 		pu.Name, pu.Email, pu.Photo, pu.Summary = strings.TrimSpace(pu.Name), strings.TrimSpace(pu.Email), strings.TrimSpace(pu.Photo), strings.TrimSpace(pu.Summary)
 
 		// use email as their id
-		pu.Key = datastore.NewKey(c, "PupalUser", pu.Email, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
+		puKey := datastore.NewKey(c, "PupalUser", pu.Email, 0, datastore.NewKey(c, "Domain", "~pupal", 0, nil))
 
 		jsonparser.ArrayEach(value, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 			dom, _ := jsonparser.GetString(value, "name")
@@ -62,13 +63,13 @@ func AdminAddPupalUserHandler(w http.ResponseWriter, r *http.Request) {
 			puDomainSet.Add(domKey)
 			pu.Domains = puDomainSet.GetSlice()
 
-			u.Name, u.Email, u.Photo, u.PupalId = pu.Name, pu.Email, pu.Photo, pu.Key.Encode()
+			u.Name, u.Email, u.Photo, u.PupalId = pu.Name, pu.Email, pu.Photo, puKey.Encode()
 			if _, err := datastore.Put(c, datastore.NewKey(c, "User", u.Email, 0, domKey), u); err != nil {
 				w.WriteHeader(500)
 				log.Println("AdminAddPupalUserHandler: Failed to add user into domain " + dom + ": " + err.Error())
 			}
 		}, "domains")
-		if _, err := datastore.Put(c, pu.Key, pu); err != nil {
+		if _, err := datastore.Put(c, puKey, pu); err != nil {
 			w.WriteHeader(500)
 			log.Println("AdminAddPupalUserHandler: Failed to add pupal user: " + err.Error())
 		}
@@ -183,6 +184,7 @@ func AdminAddProjectHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}, "projects")
 }
+*/
 
 func AdminGetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
