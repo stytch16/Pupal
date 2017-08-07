@@ -1167,12 +1167,7 @@ function Profile()  {
 
 // Firebase config
 var config = {
-	apiKey: "AIzaSyASuOuLQZVYAJnRILcQlE9ImeSTZHezcYk",
-	authDomain: "pupal-164400.firebaseapp.com",
-	databaseURL: "https://pupal-164400.firebaseio.com",
-	projectId: "pupal-164400",
-	storageBucket: "pupal-164400.appspot.com",
-	messagingSenderId: "96889471646"
+  // Go to firebase and get one!
 };
 firebase.initializeApp(config);
 console.log("Firebase initialized");
